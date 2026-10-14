@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import { AuditClient } from '@atc-web/atc-service-core/audit';
 import { createErrorHandler, registerInfo, registerOpenApi, registerProbes, registerRequestContext, requestOptions } from '@atc-web/atc-service-core/fastify';
 import { ExportError } from '../domain/errors.js';
+import { Actor } from './actor.js';
 import { ApiKeyAuth } from './api-key-auth.js';
 import { Schemas } from './schemas.js';
 import { Views } from './views.js';
@@ -85,6 +86,7 @@ export class ExportApi {
       errorResponseBuilder: (_request, context) => Object.assign(new Error(`rate limit exceeded, retry in ${context.after}`), { statusCode: 429, code: 'RATE_LIMITED' }),
     });
     const s = this.service;
+    const who = new Actor(this.config.actorKeys);
     const days = this.config.limits.retentionDays;
     const read = { preHandler: ApiKeyAuth.require('read') };
     const write = { preHandler: ApiKeyAuth.require('write') };
@@ -95,7 +97,7 @@ export class ExportApi {
     api.get('/sources', read, async () => ({ items: this.sources.list() }));
 
     api.post('/exports', { config: { audit: AuditClient.route('atc-export.export.create', (_r, b) => ({ type: 'export', id: b.export.id }), (_r, b) => ({ source: b.export.source, format: b.export.format, filters: b.export.filters, notify: Boolean(b.export.notifyEmail) })) }, ...write, schema: { body: Schemas.create } }, async (request, reply) => {
-      const j = s.create(/** @type {any} */ (request.body), request.apiKey.id);
+      const j = s.create(/** @type {any} */ (request.body), who.of(request));
       reply.header('location', `/v1/exports/${j.id}`);
       return reply.code(202).send(view(j));
     });

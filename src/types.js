@@ -42,6 +42,7 @@
  * @property {string} dbPath
  * @property {string} [dbBackupDir]
  * @property {ApiKey[]} apiKeys
+ * @property {string[]} actorKeys   Key ids whose `X-Actor` header names the acting person.
  * @property {number} rateLimitMax
  * @property {Upstream} media        Where export files are stored.
  * @property {Upstream|null} notify  Optional completion e-mails.

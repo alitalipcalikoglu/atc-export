@@ -86,3 +86,12 @@ test('API: rate limit per key', async (t) => {
   const r = await app.inject({ url: '/v1/sources', headers: bearer(READ_KEY) });
   assert.deepEqual([r.statusCode, json(r).error.code], [429, 'RATE_LIMITED']);
 });
+
+test('API: X-Actor names the creator only for ACTOR_KEYS keys', async (t) => {
+  const { app } = await buildApp(up.url, { ACTOR_KEYS: 'console' });
+  t.after(() => app.close());
+  let res = await app.inject({ method: 'POST', url: '/v1/exports', headers: { ...bearer(RW_KEY), 'x-actor': 'ayse.k' }, payload: { source: 'atc-auth', format: 'csv' } });
+  assert.equal(json(res).export.createdBy, 'ayse.k');
+  res = await app.inject({ method: 'POST', url: '/v1/exports', headers: { ...bearer(WRITE_KEY), 'x-actor': 'ayse.k' }, payload: { source: 'atc-auth', format: 'csv' } });
+  assert.equal(json(res).export.createdBy, 'ops');
+});

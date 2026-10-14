@@ -24,6 +24,7 @@ export class Config {
     this.dbPath = v.dbPath;
     this.dbBackupDir = v.dbBackupDir;
     this.apiKeys = v.apiKeys;
+    this.actorKeys = v.actorKeys;
     this.rateLimitMax = v.rateLimitMax;
     this.media = v.media;
     this.notify = v.notify;
@@ -56,6 +57,7 @@ export class Config {
     const heartbeatMs = r.integer('HEARTBEAT_MS', 15_000, { min: 1_000 });
     if (heartbeatMs * 2 > leaseMs) throw new ConfigError('HEARTBEAT_MS must be at most half of LEASE_MS');
 
+    const apiKeys = Config.#parseApiKeys(r.required('EXPORT_API_KEYS'));
     return new Config({
       port: r.integer('PORT', 3014, { min: 0, max: 65535 }),
       host: r.optional('HOST') || '0.0.0.0',
@@ -66,7 +68,8 @@ export class Config {
       bodyLimit: r.integer('BODY_LIMIT', 65_536, { min: 1_024 }),
       dbPath: r.optional('DB_PATH') || './data/export.db',
       dbBackupDir: r.optional('DB_BACKUP_DIR') || undefined,
-      apiKeys: Config.#parseApiKeys(r.required('EXPORT_API_KEYS')),
+      apiKeys,
+      actorKeys: Config.#actorKeys(r, apiKeys),
       rateLimitMax: r.integer('RATE_LIMIT_MAX', 600, { min: 1 }),
       media: /** @type {Upstream} */ (media),
       notify: Config.#upstream(r, 'NOTIFY', false),
@@ -110,6 +113,16 @@ export class Config {
     if (!/^https?:\/\/[^\s/]+(\/[^\s]*)?$/.test(url)) throw new ConfigError(`${prefix}_URL must be an absolute http(s) URL`);
     if (apiKey.length < Config.MIN_SECRET_LENGTH) throw new ConfigError(`${prefix}_API_KEY must be at least ${Config.MIN_SECRET_LENGTH} characters`);
     return { url, apiKey };
+  }
+
+  /**
+   * `ACTOR_KEYS`: ids of keys allowed to name the acting person in `X-Actor` (the console).
+   * @param {EnvReader} r @param {ApiKey[]} apiKeys
+   */
+  static #actorKeys(r, apiKeys) {
+    const ids = r.optional('ACTOR_KEYS').split(',').map((s) => s.trim()).filter(Boolean);
+    for (const id of ids) if (!apiKeys.some((k) => k.id === id)) throw new ConfigError(`ACTOR_KEYS names "${id}", which is not a key id in the API keys`);
+    return ids;
   }
 
   /**
