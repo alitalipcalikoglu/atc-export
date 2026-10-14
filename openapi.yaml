@@ -1,0 +1,447 @@
+openapi: 3.1.0
+info:
+  title: atc-export
+  version: "1.0.0"
+  description: >
+    Background data exports to files. A job names a source (a platform service), a format (CSV or
+    NDJSON) and optional filters; a durable worker pages through the source's own list API,
+    encodes the rows and streams them into a private atc-media file, optionally e-mails the
+    requester through atc-notify, and the file is fetched through a short-lived signed URL. Jobs
+    and their files are deleted after `EXPORT_RETENTION_DAYS`.
+
+
+    Auth: every `/v1/*` and `/metrics` route requires `Authorization: Bearer <api-key>` with a
+    `read`, `write` or `readwrite` role (see `ApiKeyAuth`). Every response carries
+    `Cache-Control: no-store`.
+servers:
+  - url: /
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: sources
+  - name: exports
+  - name: stats
+  - name: ops
+paths:
+  /openapi.yaml:
+    get:
+      operationId: atc-export.openapi
+      summary: Download the canonical OpenAPI document
+      security: []
+      responses:
+        "200":
+          description: Canonical OpenAPI document.
+          content:
+            text/yaml:
+              schema: { type: string }
+
+  /health:
+    get:
+      operationId: atc-export.health.get
+      summary: Liveness probe
+      description: Always `200`. Does not check any dependency.
+      tags: [ops]
+      security: []
+      x-stack-visibility: public
+      responses:
+        "200":
+          description: Process is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+
+  /ready:
+    get:
+      operationId: atc-export.ready.get
+      summary: Readiness probe
+      description: Database ping, cached for 10 seconds; reports whether the in-process worker runs.
+      tags: [ops]
+      security: []
+      x-stack-visibility: public
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, worker]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  worker: { type: string, enum: [running, stopped] }
+        "503":
+          description: The cached readiness check last failed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, error]
+                properties:
+                  status: { type: string, enum: [unavailable] }
+                  error: { type: string }
+
+  /v1/info:
+    get:
+      operationId: atc-export.info.get
+      summary: Service identity and capabilities
+      tags: [ops]
+      security: []
+      x-stack-visibility: public
+      responses:
+        "200":
+          description: Instance identity.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [service, version, apiVersion, capabilities, schemaVersion, serviceCore]
+                properties:
+                  service: { type: string, const: atc-export }
+                  version: { type: string, description: "This service's own package.json semver." }
+                  apiVersion: { type: string, const: v1 }
+                  capabilities:
+                    type: array
+                    items: { type: string }
+                    description: "`csv`, `ndjson`, `leased-worker`, `media-storage`, `email-notification` when notify is configured, and `source:<id>` per configured source."
+                  schemaVersion: { type: integer, description: "SQLite PRAGMA user_version of the open database." }
+                  serviceCore: { type: string, description: "@atc-web/atc-service-core version actually running." }
+
+  /metrics:
+    get:
+      operationId: atc-export.metrics.get
+      summary: Prometheus text-format metrics
+      description: Requires a `read`-capable API key. Not rate-limited.
+      tags: [ops]
+      x-stack-visibility: operational
+      responses:
+        "200":
+          description: >
+            `export_jobs{status}`, `export_jobs_finished_24h{outcome}`, `export_bytes_24h`,
+            `export_stored_bytes`, `export_jobs_by_source{source}`, `export_worker_events_total{event}`
+            and `export_worker_in_flight` (process-local), `export_process_uptime_seconds`.
+          content:
+            text/plain:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/sources:
+    get:
+      operationId: atc-export.sources.list
+      summary: Configured sources with their filters and CSV columns
+      description: Only sources whose `SOURCE_<NAME>_URL` and `SOURCE_<NAME>_API_KEY` are set are listed.
+      tags: [sources]
+      responses:
+        "200":
+          description: Sources.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Source" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/exports:
+    get:
+      operationId: atc-export.exports.list
+      summary: List export jobs, newest first
+      tags: [exports]
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/Status" } }
+        - { name: source, in: query, schema: { type: string, pattern: "^atc-[a-z][a-z0-9-]{0,30}$" } }
+        - { name: limit, in: query, schema: { type: string, pattern: "^([1-9]|[1-9][0-9]|100)$" }, description: Default 50, max 100. }
+        - { name: cursor, in: query, schema: { $ref: "#/components/schemas/ExportId" }, description: "`nextCursor` from the previous page." }
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Export" } }
+                  nextCursor: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: atc-export.exports.create
+      summary: Queue an export
+      description: >
+        `filters` are checked against the source's filter list from `GET /v1/sources`
+        (`INVALID_FILTER`). `notifyEmail` needs notify to be configured (`NOTIFY_DISABLED`).
+      tags: [exports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [source, format]
+              properties:
+                source: { type: string, pattern: "^atc-[a-z][a-z0-9-]{0,30}$" }
+                format: { type: string, enum: [csv, ndjson] }
+                filters: { type: object, maxProperties: 20, additionalProperties: { type: string, maxLength: 254 } }
+                notifyEmail: { type: string, format: email, maxLength: 254 }
+      responses:
+        "202":
+          description: Queued.
+          headers:
+            location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/exports/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    get:
+      operationId: atc-export.exports.get
+      summary: One export job with progress
+      tags: [exports]
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: atc-export.exports.delete
+      summary: Delete a job and its media file
+      description: Refused (`INVALID_STATE`) while the job runs; cancel it first. Irreversible.
+      tags: [exports]
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /v1/exports/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    post:
+      operationId: atc-export.exports.cancel
+      summary: Cancel a queued or running export
+      description: A queued job is cancelled at once; a running one gets `cancelRequested` and stops at its next heartbeat, discarding the partial upload.
+      tags: [exports]
+      responses:
+        "200":
+          description: The job after the request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/exports/{id}/retry:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    post:
+      operationId: atc-export.exports.retry
+      summary: Queue a failed or cancelled export again from scratch
+      tags: [exports]
+      responses:
+        "200":
+          description: The job, queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/exports/{id}/download:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    get:
+      operationId: atc-export.exports.download
+      summary: Short-lived signed URL of the export file
+      description: "`DOWNLOAD_TTL_SEC` (300 s by default). `NO_FILE` (409) unless the job succeeded with at least one row (NDJSON exports with no rows store no file). Audited."
+      tags: [exports]
+      responses:
+        "200":
+          description: Signed URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expiresAt]
+                properties:
+                  url: { type: string, format: uri }
+                  expiresAt: { type: [string, "null"], format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /v1/stats:
+    get:
+      operationId: atc-export.stats.get
+      summary: Queue, running and last-24h counts
+      tags: [stats]
+      responses:
+        "200":
+          description: Summary for dashboards.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queued, running, total, last24h, storedBytes, bySource, sources, retentionDays]
+                properties:
+                  queued: { type: integer }
+                  running: { type: integer }
+                  total: { type: integer }
+                  last24h:
+                    type: object
+                    properties:
+                      succeeded: { type: integer }
+                      failed: { type: integer }
+                      cancelled: { type: integer }
+                      rows: { type: integer }
+                      bytes: { type: integer }
+                  storedBytes: { type: integer }
+                  bySource: { type: object, additionalProperties: { type: object, additionalProperties: { type: integer } } }
+                  sources: { type: array, items: { type: string } }
+                  retentionDays: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: "`Authorization: Bearer <secret>`. Keys are `id:secret[:role]` in `EXPORT_API_KEYS`; role `read`, `write` or `readwrite` (default)."
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/ExportId" }
+  responses:
+    BadRequest:
+      description: "`VALIDATION_FAILED`, `UNKNOWN_SOURCE`, `INVALID_FILTER` or `NOTIFY_DISABLED`."
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Missing or invalid API key.
+      headers:
+        www-authenticate: { schema: { type: string, const: Bearer } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: The key's role does not permit this operation (`FORBIDDEN`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: "`EXPORT_NOT_FOUND`."
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: "`INVALID_STATE` (wrong state for cancel, retry or delete) or `NO_FILE`."
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Upstream:
+      description: "`MEDIA_ERROR`: atc-media could not sign or delete the file."
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    RateLimited:
+      description: Per-key rate limit exceeded (`RATE_LIMITED`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  schemas:
+    ExportId: { type: string, pattern: "^exp_[0-9a-z]{9}[0-9a-f]{12}$" }
+    Status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+    Source:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        formats: { type: array, items: { type: string, enum: [csv, ndjson] } }
+        columns: { type: array, items: { type: string } }
+        filters:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              type: { type: string, const: string }
+              description: { type: string }
+              required: { type: boolean }
+              enum: { type: array, items: { type: string } }
+              pattern: { type: string }
+              maxLength: { type: integer }
+              format: { type: string, enum: [date-time, email] }
+    ExportEnvelope:
+      type: object
+      required: [export]
+      properties:
+        export: { $ref: "#/components/schemas/Export" }
+    Export:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ExportId" }
+        source: { type: string }
+        format: { type: string, enum: [csv, ndjson] }
+        filters: { type: object, additionalProperties: { type: string } }
+        notifyEmail: { type: [string, "null"] }
+        status: { $ref: "#/components/schemas/Status" }
+        attempts: { type: integer }
+        maxAttempts: { type: integer }
+        nextRunAt: { type: [string, "null"], format: date-time, description: Set while a transient failure waits for the next attempt. }
+        cancelRequested: { type: boolean }
+        progress:
+          type: object
+          properties:
+            rows: { type: integer }
+            bytes: { type: integer }
+        file: { type: [object, "null"], properties: { name: { type: string } } }
+        error: { type: [object, "null"], properties: { code: { type: string }, message: { type: string } }, description: "Last error: `UPSTREAM_ERROR`, `MEDIA_ERROR`, `TOO_MANY_ROWS`, `TOO_LARGE`, `INTERRUPTED`." }
+        notification: { type: [string, "null"], enum: [pending, sent, failed, null] }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: [string, "null"], format: date-time }
+        finishedAt: { type: [string, "null"], format: date-time }
+        updatedAt: { type: string, format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time, description: When retention deletes the job and its file. }

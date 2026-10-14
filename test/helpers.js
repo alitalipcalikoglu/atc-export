@@ -114,3 +114,18 @@ export function testSystem(url, overrides, { now = Date.now } = {}) {
   const worker = new Worker({ jobs, sources, media, notifier, log: silent, options: config.worker, limits: config.limits, now });
   return { config, db, jobs, sources, media, notifier, service, worker };
 }
+
+/** Fully wired Fastify app over the fake upstream. @param {string} url @param {Record<string, string>} [overrides] @param {object} [deps] */
+export async function buildApp(url, overrides, deps = {}) {
+  const { readServiceVersion } = await import('@atc-web/atc-service-core/fastify');
+  const { ExportApi } = await import('../src/http/export-api.js');
+  const t = testSystem(url, overrides);
+  const app = await new ExportApi({ ...t, version: readServiceVersion(import.meta.url), ...deps }).build();
+  await app.ready();
+  return { app, ...t };
+}
+
+/** @param {string} key */
+export function bearer(key) {
+  return { authorization: `Bearer ${key}` };
+}
