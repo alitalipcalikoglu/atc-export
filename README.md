@@ -93,7 +93,7 @@ All configuration is environment variables; [.env.example](.env.example) documen
 | `EXPORT_API_KEYS` | required | `id:secret[:role]`; role `read`, `write`, `readwrite` (default) |
 | `ACTOR_KEYS` | empty | Key ids (the console) that may name the acting person in an `X-Actor` header; records show that name instead of the key id. Ignored for every other key |
 | `MEDIA_URL`, `MEDIA_API_KEY` | required | Destination media service and its key |
-| `SOURCE_<AUDIT\|AUTH\|SHORTLINK\|FLAGS\|MEDIA\|CONTENT>_URL` / `_API_KEY` | empty | Source services (both or neither each), read keys |
+| `SOURCE_<AUDIT\|AUTH\|SHORTLINK\|FLAGS\|MEDIA\|CONTENT\|PAYMENTS\|STATUS\|QUEUE\|SCHEDULER\|WEBHOOK_OUT>_URL` / `_API_KEY` | empty | Source services (both or neither each), read keys |
 | `NOTIFY_URL`, `NOTIFY_API_KEY` | empty | Completion e-mails (both or neither) |
 | `EXPORT_APP_NAME` | `atc-web` | Sender application in e-mails |
 | `WORKER_CONCURRENCY`, `POLL_MS` | `2`, `1000` | Parallel exports, queue polling |
