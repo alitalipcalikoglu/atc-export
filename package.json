@@ -1,0 +1,31 @@
+{
+  "name": "@atc-web/atc-export",
+  "version": "1.17.1",
+  "private": true,
+  "description": "Background data exports to files: source adapters over the platform list APIs, CSV/NDJSON streamed into private media files, durable leased worker, retention",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alitalipcalikoglu/atc-export.git"
+  },
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch --env-file=.env src/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "typecheck": "tsc -p jsconfig.json"
+  },
+  "dependencies": {
+    "@atc-web/atc-service-core": "github:alitalipcalikoglu/atc-service-core#v1.17.1",
+    "@fastify/rate-limit": "11.2.0",
+    "fastify": "5.12.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.3",
+    "typescript": "7.0.2"
+  }
+}
