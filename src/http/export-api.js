@@ -8,6 +8,7 @@ import { Actor } from './actor.js';
 import { ApiKeyAuth } from './api-key-auth.js';
 import { Schemas } from './schemas.js';
 import { Views } from './views.js';
+import { AuditMetrics } from '../audit-metrics.js';
 
 /** @typedef {import('../config.js').Config} Config */
 /** @typedef {import('fastify').FastifyInstance} FastifyInstance */
@@ -158,6 +159,7 @@ export class ExportApi {
         '# HELP export_worker_in_flight Jobs this process is running now.',
         '# TYPE export_worker_in_flight gauge',
         `export_worker_in_flight ${this.worker.inFlight.size}`,
+        ...AuditMetrics.lines(this.audit),
         '# HELP export_process_uptime_seconds Process uptime.',
         '# TYPE export_process_uptime_seconds gauge',
         `export_process_uptime_seconds ${process.uptime().toFixed(0)}`,

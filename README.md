@@ -150,6 +150,8 @@ With `AUDIT_URL` and `AUDIT_API_KEY` set, every completed write request and ever
 
 Request logs with request id and trace context; worker logs under `component: worker`. `/metrics` (jobs by status, last 24 h outcomes and bytes, stored bytes, per source, worker events), `/v1/stats` for dashboards, `/ready` with the worker state. See [docs/READINESS.md](docs/READINESS.md).
 
+Audit forwarding is observable too: `audit_forward_enabled`, `audit_forward_events_total{result="recorded|sent|dropped|failed"}` and `audit_forward_pending`. A rising `dropped`, or a `pending` that does not drain, means audit events are being lost or delayed; alert on it.
+
 ## Backup / restore
 
 The SQLite file at `DB_PATH` holds the job list; export files live in atc-media and expire with their jobs. `sqlite3 data/export.db "VACUUM INTO 'backup.db'"` takes an online copy. Restore by stopping the service, replacing the file and starting again; running jobs in the copy are recovered as interrupted. Migrations are not reversible.
