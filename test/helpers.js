@@ -56,6 +56,18 @@ export async function fakeUpstream() {
       res.write(lines.slice(0, 17));
       return setTimeout(() => res.end(lines.slice(17)), 5);
     }
+    if (p === '/v1/payments') {
+      const start = Number(url.searchParams.get('cursor') ?? 0);
+      const all = [1, 2, 3].map((n) => ({ id: `pay_${n}`, status: url.searchParams.get('status') ?? 'succeeded', amount: n * 100, currency: 'eur', amountRefunded: 0, description: 'd', customerEmail: `c${n}@example.com`, metadata: { order: String(n) }, provider: { name: 'stripe', id: `pi_${n}`, status: 'succeeded' }, createdBy: 'shop', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }));
+      const items = all.slice(start, start + 2);
+      return json(200, { items, nextCursor: start + 2 < all.length ? String(start + 2) : null });
+    }
+    if (p === '/v1/runs') {
+      const before = Number(url.searchParams.get('before') ?? 99);
+      const items = [5, 4, 3, 2, 1].filter((id) => id < before).slice(0, 2).map((id) => ({ id, job: url.searchParams.get('job') ?? 'nightly', trigger: 'schedule', status: 'failed', scheduledFor: '2026-01-01T00:00:00.000Z', attempt: 1, maxAttempts: 2, startedAt: null, finishedAt: null, durationMs: 5, httpStatus: 500, error: 'boom', attempts: [{ n: 1 }], createdAt: '2026-01-01T00:00:00.000Z' }));
+      return json(200, { items, nextBefore: items.length === 2 && items[1].id > 1 ? String(items[1].id) : null });
+    }
+    if (p === '/v1/queues/jobs/messages') return json(200, { items: [{ id: 'msg_1', queue: 'jobs', state: url.searchParams.get('state'), body: { to: 'a' }, priority: 0, attempts: 3, lastError: 'bad', enqueuedAt: '2026-01-01T00:00:00.000Z', deadAt: '2026-01-02T00:00:00.000Z' }], nextCursor: null });
     if (p === '/v1/namespaces/web/keys') return json(200, { items: url.searchParams.get('missing') ? state.keys.filter((k) => !k.values['tr-CY']) : state.keys, nextCursor: null });
     if (p === '/v1/files' && req.method === 'PUT') {
       const chunks = /** @type {Buffer[]} */ ([]);

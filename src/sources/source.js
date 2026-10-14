@@ -18,6 +18,9 @@ export class Source {
   /** @returns {Record<string, FilterSpec>} */ get filters() { return {}; }
   /** @returns {string[]} */ get columns() { throw new Error('abstract'); }
   /** Page size the owning service accepts. */ get pageSize() { return 100; }
+  /** Query parameter that carries the cursor, and the response field that holds the next one (`before`/`nextBefore` on keyset lists). */
+  get cursorParam() { return 'cursor'; }
+  get nextField() { return 'nextCursor'; }
 
   /**
    * Validate and normalise caller filters against {@link filters}. Unknown names are rejected.
@@ -74,9 +77,9 @@ export class Source {
     const seen = new Set();
     do {
       const sep = this.listPath(filters).includes('?') ? '&' : '?';
-      const page = /** @type {{ items: Record<string, unknown>[], nextCursor: string|null }} */ (await this.http.json(`${this.listPath(filters)}${sep}limit=${this.pageSize}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, signal));
+      const page = /** @type {Record<string, any> & { items: Record<string, unknown>[] }} */ (await this.http.json(`${this.listPath(filters)}${sep}limit=${this.pageSize}${cursor ? `&${this.cursorParam}=${encodeURIComponent(cursor)}` : ''}`, signal));
       for (const item of page.items) yield this.record(item, filters);
-      cursor = page.nextCursor ?? null;
+      cursor = page[this.nextField] ?? null;
       // A cursor that repeats would loop forever; treat it as an upstream fault.
       if (cursor !== null && seen.has(cursor)) throw new ExportError('UPSTREAM_ERROR', `${this.id} returned a repeating cursor`);
       if (cursor !== null) seen.add(cursor);

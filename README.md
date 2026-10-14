@@ -51,6 +51,13 @@ npm run typecheck
 | `atc-flags` | `GET /v1/flags` | `q`, `tag`, `kind`, `archived` |
 | `atc-media` | `GET /v1/files` (metadata) | – |
 | `atc-content` | `GET /v1/namespaces/:ns/keys` | `namespace`*, `locale`*, `missing`, `q` |
+| `atc-payments` | `GET /v1/payments` | `status` |
+| `atc-payments-ledger` | `GET /v1/ledger` | – |
+| `atc-status` | `GET /v1/incidents` | `monitor`, `state` |
+| `atc-status-alerts` | `GET /v1/alerts` | `state` |
+| `atc-queue` | `GET /v1/queues/:q/messages` | `queue`*, `state` (dead letters by default) |
+| `atc-scheduler` | `GET /v1/runs` | `job`, `status` |
+| `atc-webhook-out` | `GET /v1/deliveries` | `status`, `subscription` |
 
 ## API
 

@@ -22,6 +22,13 @@ Only sources whose `SOURCE_<NAME>_URL` and `SOURCE_<NAME>_API_KEY` are both set 
 | `atc-flags` | `GET /v1/flags` | `q`, `tag`, `kind`, `archived` | `environments` is one JSON column in CSV |
 | `atc-media` | `GET /v1/files` | – | Metadata only; never bytes or signed URLs |
 | `atc-content` | `GET /v1/namespaces/:ns/keys` | `namespace` (required), `locale` (required), `missing`, `q` | The draft value in that locale; `missing=true` lists untranslated keys |
+| `atc-payments` | `GET /v1/payments` | `status` | Contains customer e-mail addresses and metadata; treat the file like the payments themselves |
+| `atc-payments-ledger` | `GET /v1/ledger` | – | One row per charge or refund (signed minor units); shares `SOURCE_PAYMENTS_*` with `atc-payments` |
+| `atc-status` | `GET /v1/incidents` | `monitor`, `state` | Incidents with cause and duration |
+| `atc-status-alerts` | `GET /v1/alerts` | `state` | Operational alerts; shares `SOURCE_STATUS_*` |
+| `atc-queue` | `GET /v1/queues/:q/messages` | `queue` (required), `state` | Dead letters unless `state` says otherwise; includes message bodies (application data) |
+| `atc-scheduler` | `GET /v1/runs` | `job`, `status` | Newest first; attempt logs are left out |
+| `atc-webhook-out` | `GET /v1/deliveries` | `status`, `subscription` | Newest first; response bodies and attempt logs are left out |
 
 ## Scenario: hand untranslated Turkish strings to a translator
 

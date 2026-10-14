@@ -10,7 +10,7 @@ export { ConfigError };
 export class Config {
   static MIN_SECRET_LENGTH = 32;
   /** Source id -> env prefix of its `<PREFIX>_URL` / `<PREFIX>_API_KEY` pair. */
-  static SOURCES = /** @type {const} */ ({ 'atc-audit': 'SOURCE_AUDIT', 'atc-auth': 'SOURCE_AUTH', 'atc-shortlink': 'SOURCE_SHORTLINK', 'atc-flags': 'SOURCE_FLAGS', 'atc-media': 'SOURCE_MEDIA', 'atc-content': 'SOURCE_CONTENT' });
+  static SOURCES = /** @type {const} */ ({ 'atc-audit': 'SOURCE_AUDIT', 'atc-auth': 'SOURCE_AUTH', 'atc-shortlink': 'SOURCE_SHORTLINK', 'atc-flags': 'SOURCE_FLAGS', 'atc-media': 'SOURCE_MEDIA', 'atc-content': 'SOURCE_CONTENT', 'atc-payments': 'SOURCE_PAYMENTS', 'atc-payments-ledger': 'SOURCE_PAYMENTS', 'atc-status': 'SOURCE_STATUS', 'atc-status-alerts': 'SOURCE_STATUS', 'atc-queue': 'SOURCE_QUEUE', 'atc-scheduler': 'SOURCE_SCHEDULER', 'atc-webhook-out': 'SOURCE_WEBHOOK_OUT' });
 
   /** @param {import('./types.js').ConfigValues} v */
   constructor(v) {

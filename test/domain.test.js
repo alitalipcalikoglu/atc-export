@@ -108,3 +108,22 @@ test('ExportService: create validation, cancel/retry/delete state rules, downloa
   const list = jobs.list({ limit: 10 });
   assert.equal(list.length, 1);
 });
+
+test('sources: payments, ledger, queue dead letters, scheduler runs and webhook deliveries share the paging and column rules', async () => {
+  const env = { SOURCE_PAYMENTS_URL: up.url, SOURCE_PAYMENTS_API_KEY: 'u'.repeat(40), SOURCE_QUEUE_URL: up.url, SOURCE_QUEUE_API_KEY: 'u'.repeat(40), SOURCE_SCHEDULER_URL: up.url, SOURCE_SCHEDULER_API_KEY: 'u'.repeat(40), SOURCE_STATUS_URL: up.url, SOURCE_STATUS_API_KEY: 'u'.repeat(40), SOURCE_WEBHOOK_OUT_URL: up.url, SOURCE_WEBHOOK_OUT_API_KEY: 'u'.repeat(40) };
+  const { sources } = testSystem(up.url, env);
+  assert.deepEqual(sources.list().map((s) => s.id).sort(), ['atc-audit', 'atc-auth', 'atc-content', 'atc-payments', 'atc-payments-ledger', 'atc-queue', 'atc-scheduler', 'atc-status', 'atc-status-alerts', 'atc-webhook-out']);
+  const signal = new AbortController().signal;
+  const collect = async (/** @type {string} */ id, /** @type {Record<string, string>} */ f) => { const s = sources.get(id); const out = []; for await (const r of s.rows(s.validate(f), signal)) out.push(r); return out; };
+  const pays = await collect('atc-payments', { status: 'refunded' });
+  assert.deepEqual(pays.map((p) => [p.id, p.status, p.providerId, p.customerEmail]), [['pay_1', 'refunded', 'pi_1', 'c1@example.com'], ['pay_2', 'refunded', 'pi_2', 'c2@example.com'], ['pay_3', 'refunded', 'pi_3', 'c3@example.com']]);
+  const runs = await collect('atc-scheduler', { job: 'nightly.report', status: 'failed' });
+  assert.deepEqual(runs.map((r) => r.id), [5, 4, 3, 2, 1], 'keyset paging with before/nextBefore');
+  assert.ok(up.state.seen.some((s) => s.url.startsWith('/v1/runs?job=nightly.report&status=failed&limit=100&before=4')));
+  assert.ok(!('attempts' in /** @type {any} */ (runs[0])), 'attempt logs are not part of the columns');
+  const dead = await collect('atc-queue', { queue: 'jobs' });
+  assert.deepEqual([dead[0].id, dead[0].state, dead[0].body], ['msg_1', 'dead', { to: 'a' }]);
+  assert.throws(() => sources.get('atc-queue').validate({}), fails('INVALID_FILTER'), 'queue is required');
+  assert.throws(() => sources.get('atc-scheduler').validate({ job: 'Bad Name' }), fails('INVALID_FILTER'));
+  assert.throws(() => sources.get('atc-webhook-out').validate({ subscription: 'x' }), fails('INVALID_FILTER'));
+});

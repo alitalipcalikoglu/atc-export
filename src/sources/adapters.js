@@ -158,6 +158,125 @@ export class ContentKeysSource extends Source {
   }
 }
 
+/** Payments with their provider state. Contains customer e-mail addresses: the file is as sensitive as the payments themselves. */
+export class PaymentsSource extends Source {
+  get id() { return 'atc-payments'; }
+  get label() { return 'Payments'; }
+  /** @returns {Record<string, FilterSpec>} */
+  get filters() { return { status: { type: 'string', enum: ['pending', 'processing', 'succeeded', 'canceled', 'partially_refunded', 'refunded'], description: 'Payment status.' } }; }
+  get columns() { return ['id', 'status', 'amount', 'currency', 'amountRefunded', 'description', 'customerEmail', 'metadata', 'providerId', 'providerStatus', 'createdBy', 'createdAt', 'updatedAt']; }
+  /** @param {Record<string, string>} f */
+  listPath(f) { return `/v1/payments${Source.query({ status: f.status })}`; }
+  /** @param {Record<string, any>} p */
+  record(p) {
+    return {
+      id: p.id, status: p.status, amount: p.amount, currency: p.currency, amountRefunded: p.amountRefunded ?? 0, description: p.description ?? '', customerEmail: p.customerEmail ?? null,
+      metadata: p.metadata ?? {}, providerId: p.provider?.id ?? null, providerStatus: p.provider?.status ?? null, createdBy: p.createdBy, createdAt: p.createdAt, updatedAt: p.updatedAt,
+    };
+  }
+}
+
+/** The payments ledger: one row per charge or refund, newest first. */
+export class PaymentsLedgerSource extends Source {
+  get id() { return 'atc-payments-ledger'; }
+  get label() { return 'Payments ledger'; }
+  get pageSize() { return 200; }
+  get columns() { return ['seq', 'paymentId', 'kind', 'amount', 'currency', 'ref', 'at']; }
+  listPath() { return '/v1/ledger'; }
+  /** @param {Record<string, unknown>} e */
+  record(e) { return Object.fromEntries(this.columns.map((c) => [c, e[c] ?? null])); }
+}
+
+/** Status incidents. */
+export class StatusIncidentsSource extends Source {
+  get id() { return 'atc-status'; }
+  get label() { return 'Status incidents'; }
+  /** @returns {Record<string, FilterSpec>} */
+  get filters() {
+    return {
+      monitor: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{0,63}$', description: 'Monitor id.' },
+      state: { type: 'string', enum: ['open', 'closed'], description: 'Incident state.' },
+    };
+  }
+  get columns() { return ['id', 'monitor', 'state', 'openedAt', 'closedAt', 'durationSec', 'cause', 'lastError', 'failures', 'notifyError']; }
+  /** @param {Record<string, string>} f */
+  listPath(f) { return `/v1/incidents${Source.query({ monitor: f.monitor, state: f.state })}`; }
+  /** @param {Record<string, unknown>} i */
+  record(i) { return Object.fromEntries(this.columns.map((c) => [c, i[c] ?? null])); }
+}
+
+/** Operational alerts of the status service. */
+export class StatusAlertsSource extends Source {
+  get id() { return 'atc-status-alerts'; }
+  get label() { return 'Operational alerts'; }
+  /** @returns {Record<string, FilterSpec>} */
+  get filters() { return { state: { type: 'string', enum: ['open', 'acked'], description: 'Alert state.' } }; }
+  get columns() { return ['id', 'type', 'key', 'severity', 'title', 'message', 'count', 'firstAt', 'lastAt', 'state', 'ackedAt', 'ackedBy', 'notifyError']; }
+  /** @param {Record<string, string>} f */
+  listPath(f) { return `/v1/alerts${Source.query({ state: f.state })}`; }
+  /** @param {Record<string, unknown>} a */
+  record(a) { return Object.fromEntries(this.columns.map((c) => [c, a[c] ?? null])); }
+}
+
+/** Messages of one queue by state (dead letters by default), with their bodies. Bodies are application data: treat the file accordingly. */
+export class QueueMessagesSource extends Source {
+  get id() { return 'atc-queue'; }
+  get label() { return 'Queue messages'; }
+  get pageSize() { return 200; }
+  /** @returns {Record<string, FilterSpec>} */
+  get filters() {
+    return {
+      queue: { type: 'string', required: true, pattern: '^[a-z][a-z0-9._-]{0,63}$', description: 'Queue name.' },
+      state: { type: 'string', enum: ['ready', 'delayed', 'leased', 'dead'], description: 'Message state; dead letters when omitted.' },
+    };
+  }
+  get columns() { return ['id', 'queue', 'state', 'priority', 'attempts', 'dedupeKey', 'availableAt', 'lastError', 'enqueuedBy', 'enqueuedAt', 'deadAt', 'body']; }
+  /** @param {Record<string, string>} f */
+  listPath(f) { return `/v1/queues/${encodeURIComponent(f.queue)}/messages?state=${f.state ?? 'dead'}`; }
+  /** @param {Record<string, unknown>} m */
+  record(m) { return Object.fromEntries(this.columns.map((c) => [c, m[c] ?? null])); }
+}
+
+/** Scheduler runs, newest first. */
+export class SchedulerRunsSource extends Source {
+  get id() { return 'atc-scheduler'; }
+  get label() { return 'Scheduler runs'; }
+  get cursorParam() { return 'before'; }
+  get nextField() { return 'nextBefore'; }
+  /** @returns {Record<string, FilterSpec>} */
+  get filters() {
+    return {
+      job: { type: 'string', maxLength: 80, pattern: '^[a-z0-9]+([.\\-_][a-z0-9]+)*$', description: 'Job name.' },
+      status: { type: 'string', enum: ['pending', 'running', 'retrying', 'succeeded', 'failed', 'skipped', 'cancelled'], description: 'Run status.' },
+    };
+  }
+  get columns() { return ['id', 'job', 'trigger', 'status', 'scheduledFor', 'attempt', 'maxAttempts', 'startedAt', 'finishedAt', 'durationMs', 'httpStatus', 'error', 'createdAt']; }
+  /** @param {Record<string, string>} f */
+  listPath(f) { return `/v1/runs${Source.query({ job: f.job, status: f.status })}`; }
+  /** @param {Record<string, unknown>} r */
+  record(r) { return Object.fromEntries(this.columns.map((c) => [c, r[c] ?? null])); }
+}
+
+/** Webhook deliveries, newest first. */
+export class WebhookDeliveriesSource extends Source {
+  get id() { return 'atc-webhook-out'; }
+  get label() { return 'Webhook deliveries'; }
+  get cursorParam() { return 'before'; }
+  get nextField() { return 'nextBefore'; }
+  /** @returns {Record<string, FilterSpec>} */
+  get filters() {
+    return {
+      status: { type: 'string', enum: ['pending', 'running', 'retrying', 'succeeded', 'failed', 'cancelled'], description: 'Delivery status.' },
+      subscription: { type: 'string', pattern: '^sub_[0-9a-f]{16}$', description: 'Subscription id.' },
+    };
+  }
+  get columns() { return ['id', 'eventId', 'subscriptionId', 'status', 'attempt', 'maxAttempts', 'nextAttemptAt', 'startedAt', 'finishedAt', 'durationMs', 'httpStatus', 'error', 'createdAt']; }
+  /** @param {Record<string, string>} f */
+  listPath(f) { return `/v1/deliveries${Source.query({ status: f.status, subscription: f.subscription })}`; }
+  /** @param {Record<string, unknown>} d */
+  record(d) { return Object.fromEntries(this.columns.map((c) => [c, d[c] ?? null])); }
+}
+
 /** The adapters this build knows, by source id. */
 export const ADAPTERS = /** @type {const} */ ({
   'atc-audit': AuditEventsSource,
@@ -166,4 +285,11 @@ export const ADAPTERS = /** @type {const} */ ({
   'atc-flags': FlagsSource,
   'atc-media': MediaFilesSource,
   'atc-content': ContentKeysSource,
+  'atc-payments': PaymentsSource,
+  'atc-payments-ledger': PaymentsLedgerSource,
+  'atc-status': StatusIncidentsSource,
+  'atc-status-alerts': StatusAlertsSource,
+  'atc-queue': QueueMessagesSource,
+  'atc-scheduler': SchedulerRunsSource,
+  'atc-webhook-out': WebhookDeliveriesSource,
 });
