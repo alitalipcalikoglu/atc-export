@@ -133,7 +133,7 @@ examples/, docs/READINESS.md
 ## Out of scope by design
 
 - Spreadsheet formats (XLSX), compression, encryption at rest beyond what media provides.
-- Scheduled or recurring exports (use atc-scheduler to call `POST /v1/exports`).
+- Scheduled or recurring exports in the service itself: atc-scheduler calls `POST /v1/exports` (see the scheduler's `examples/internal-services.md`).
 - Exporting a service that has no paged list API, or file contents from media.
 - Resuming a run mid-file: a rerun starts from the beginning.
 - An API/worker process split; the worker always runs in the service process.
