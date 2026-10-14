@@ -1,7 +1,11 @@
 /** Turns rows into CSV (RFC 4180, formula-injection guarded) or NDJSON lines. */
 export class Encoder {
-  /** Cells starting with these are prefixed with `'` so spreadsheets never evaluate them as formulas. */
-  static FORMULA = /^[=+\-@\t\r]/;
+  /**
+   * String cells matching this are prefixed with `'` so spreadsheets never evaluate them: a
+   * formula sign after optional leading whitespace, or a leading tab/CR. Tested on the cleaned
+   * string, so a control character cannot hide the sign.
+   */
+  static FORMULA = /^(\s*[=+\-@]|[\t\r])/;
   // eslint-disable-next-line no-control-regex
   static CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
@@ -23,9 +27,10 @@ export class Encoder {
   }
 
   /**
-   * One CSV cell. Strings are injection-guarded; numbers and booleans are written as is (a negative
-   * number is data, not a formula); arrays and objects become JSON. Control characters other than
-   * tab, CR and LF are dropped.
+   * One CSV cell. Control characters other than tab, CR and LF are dropped first, then strings
+   * are injection-guarded. Policy: numbers and booleans stay as they are (a negative number such as
+   * -5 is data, not a formula; it never came from a string), so only string values are guarded.
+   * Arrays and objects become JSON, cleaned and guarded like strings.
    * @param {unknown} value
    */
   static cell(value) {
@@ -33,9 +38,10 @@ export class Encoder {
     /** @type {string} */
     let s;
     if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') s = String(value);
-    else if (typeof value === 'string') s = Encoder.FORMULA.test(value) ? `'${value}` : value;
-    else s = JSON.stringify(value);
-    s = s.replace(Encoder.CONTROL, '');
+    else {
+      s = (typeof value === 'string' ? value : JSON.stringify(value)).replace(Encoder.CONTROL, '');
+      if (Encoder.FORMULA.test(s)) s = `'${s}`;
+    }
     return /[",\r\n]/.test(s) || s !== s.trim() ? `"${s.replaceAll('"', '""')}"` : s;
   }
 }

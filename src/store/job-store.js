@@ -44,9 +44,17 @@ export class JobStore {
     };
   }
 
-  /** Time-ordered id: lexical order is creation order, so it doubles as the list cursor. @param {number} now */
+  static #lastIdMs = 0;
+
+  /**
+   * Time-ordered id: lexical order is creation order (strictly, within this process), so it
+   * doubles as the list cursor. The time part only orders; it is not read back as data.
+   * @param {number} now
+   */
   static newId(now) {
-    return `exp_${now.toString(36).padStart(9, '0')}${randomBytes(6).toString('hex')}`;
+    const ms = Math.max(now, JobStore.#lastIdMs + 1);
+    JobStore.#lastIdMs = ms;
+    return `exp_${ms.toString(36).padStart(9, '0')}${randomBytes(6).toString('hex')}`;
   }
 
   /**

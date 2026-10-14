@@ -24,6 +24,12 @@ test('Encoder: RFC 4180 quoting, formula-injection guard, types, control charact
   assert.equal(Encoder.cell(null), '');
   assert.equal(Encoder.cell(['a', 'b']), '"[""a"",""b""]"');
   assert.equal(Encoder.cell('bell\u0007end'), 'bellend');
+  assert.equal(Encoder.cell('\u0001=1+1'), "'=1+1", 'control characters cannot hide a formula');
+  assert.equal(Encoder.cell(' =1+1'), "' =1+1", 'leading whitespace before a formula sign');
+  assert.equal(Encoder.cell('\t=1'), "'\t=1");
+  assert.equal(Encoder.cell('\r@x'), "\"'\r@x\"");
+  assert.equal(Encoder.cell('-5'), "'-5", 'a string that looks like a negative number is still a string');
+  assert.equal(Encoder.cell({ a: '=1' }), '"{""a"":""=1""}"', 'JSON starts with { so it is never a formula');
   const csv = new Encoder('csv', ['a', 'b']);
   assert.equal(csv.header() + csv.line({ a: 1, b: 'x' }), 'a,b\r\n1,x\r\n');
   const nd = new Encoder('ndjson', ['a']);
