@@ -140,7 +140,7 @@ examples/, docs/READINESS.md
 
 ## Audit events
 
-With `AUDIT_URL` and `AUDIT_API_KEY` set, every completed write request and every download URL request is forwarded to the audit service as one event (`success`, or `denied` on 403) with the calling key as actor and `{ type: "export", id }` as target: `atc-export.export.create` (meta: source, format, filters, whether an e-mail was requested), `atc-export.export.cancel`, `atc-export.export.retry`, `atc-export.export.download`, `atc-export.export.delete`. Exported data and e-mail addresses never appear in events. Details: [examples/audit-events.md](examples/audit-events.md).
+With `AUDIT_URL` and `AUDIT_API_KEY` set, every completed write request and every download URL request is forwarded to the audit service as one event (`success`, or `denied` on 403) with the calling key as actor (or, for an `ACTOR_KEYS` key sending `X-Actor`, that admin as actor and the key in `meta.via`) and `{ type: "export", id }` as target: `atc-export.export.create` (meta: source, format, filters, whether an e-mail was requested), `atc-export.export.cancel`, `atc-export.export.retry`, `atc-export.export.download`, `atc-export.export.delete`. Exported data and e-mail addresses never appear in events. Details: [examples/audit-events.md](examples/audit-events.md).
 
 ## Scaling model
 

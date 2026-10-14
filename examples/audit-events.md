@@ -22,3 +22,14 @@ One event per completed request, `outcome: "success"` for 2xx, `"denied"` when t
 | `atc-export.export.delete` | `DELETE /v1/exports/:id` | |
 
 Exported data never appears in events. Query the audit service by `source=atc-export` or `actionPrefix=atc-export.`.
+
+
+## Who is the actor
+
+The actor is the calling API key (`{ "type": "apikey", "id": "<key id>" }`). When the key is listed in `ACTOR_KEYS` (the console) and sends a valid `X-Actor` header, the event names that person instead, and the key moves to `meta.via`:
+
+```json
+{ "action": "atc-export.export.create", "actor": { "type": "admin", "id": "ayse.k" }, "meta": { "via": "atc-console" } }
+```
+
+`X-Actor` from any other key is ignored; its events keep the key as actor.

@@ -1,3 +1,4 @@
+import { AuditClient } from '@atc-web/atc-service-core/audit';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, before, test } from 'node:test';
@@ -88,10 +89,14 @@ test('API: rate limit per key', async (t) => {
 });
 
 test('API: X-Actor names the creator only for ACTOR_KEYS keys', async (t) => {
-  const { app } = await buildApp(up.url, { ACTOR_KEYS: 'console' });
+  const audit = new AuditClient({ target: { url: 'http://audit.test', apiKey: 'a'.repeat(40) }, logger: { warn() {}, error() {} }, fetch: async () => new Response('{}', { status: 200 }) });
+  const { app } = await buildApp(up.url, { ACTOR_KEYS: 'console' }, { audit });
   t.after(() => app.close());
   let res = await app.inject({ method: 'POST', url: '/v1/exports', headers: { ...bearer(RW_KEY), 'x-actor': 'ayse.k' }, payload: { source: 'atc-auth', format: 'csv' } });
   assert.equal(json(res).export.createdBy, 'ayse.k');
   res = await app.inject({ method: 'POST', url: '/v1/exports', headers: { ...bearer(WRITE_KEY), 'x-actor': 'ayse.k' }, payload: { source: 'atc-auth', format: 'csv' } });
   assert.equal(json(res).export.createdBy, 'ops');
+  const [named, plain] = audit.buffer;
+  assert.deepEqual([named.actor, /** @type {any} */ (named.meta)?.via], [{ type: 'admin', id: 'ayse.k' }, 'console'], 'audit names the admin, the key stays in meta.via');
+  assert.deepEqual([plain.actor?.type, /** @type {any} */ (plain.meta)?.via], ['apikey', undefined]);
 });
