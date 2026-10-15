@@ -10,7 +10,7 @@ test('Config: defaults, roles, configured sources only', () => {
   assert.equal(c.port, 3014);
   assert.deepEqual(c.apiKeys.map((k) => [k.id, k.role]), [['console', 'readwrite'], ['dashboard', 'read'], ['ops', 'write']]);
   assert.deepEqual(Object.keys(c.sources), ['atc-audit', 'atc-auth', 'atc-content']);
-  assert.deepEqual(c.limits, { maxRows: 100000, maxBytes: 20971520, retentionDays: 7, downloadTtlSec: 300 });
+  assert.deepEqual(c.limits, { maxRows: 1000000, maxBytes: 268435456, retentionDays: 7, downloadTtlSec: 300 });
   assert.equal(c.worker.concurrency, 2);
   assert.equal(c.appName, 'atc-web');
   assert.ok(Object.isFrozen(c) && Object.isFrozen(c.worker) && Object.isFrozen(c.sources));

@@ -1,4 +1,7 @@
+import { mkdtempSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Config } from '../src/config.js';
 import { Database } from '../src/db.js';
 import { ExportService } from '../src/domain/export-service.js';
@@ -29,6 +32,7 @@ export async function fakeUpstream() {
     /** @type {any[]} */ mails: [],
     /** @type {{ method: string, url: string, auth: string|undefined }[]} */ seen: [],
     failUsers: 0,          // next N /v1/users calls answer 503
+    failCursor: '',        // /v1/users pages at this cursor answer 503 while set
     usersStatus: 0,        // when set, every /v1/users call answers this status
     slowMs: 0,             // delay per /v1/users page
     uploadStatus: 0,       // when set, PUT /v1/files answers this status
@@ -43,6 +47,7 @@ export async function fakeUpstream() {
     if (p === '/v1/users') {
       if (state.usersStatus) return json(state.usersStatus, { error: { code: 'X', message: 'nope' } });
       if (state.failUsers > 0) { state.failUsers--; return json(503, { error: { code: 'DOWN', message: 'down' } }); }
+      if (state.failCursor && url.searchParams.get('cursor') === state.failCursor) return json(503, { error: { code: 'DOWN', message: 'down' } });
       const limit = Number(url.searchParams.get('limit'));
       const start = Number(url.searchParams.get('cursor') ?? 0);
       const items = state.users.slice(start, start + Math.min(limit, 3));
@@ -108,6 +113,7 @@ export function testEnv(url, overrides = {}) {
     SOURCE_AUTH_URL: url, SOURCE_AUTH_API_KEY: UP_KEY, SOURCE_AUDIT_URL: url, SOURCE_AUDIT_API_KEY: UP_KEY,
     SOURCE_CONTENT_URL: url, SOURCE_CONTENT_API_KEY: UP_KEY,
     HEARTBEAT_MS: '1000', LEASE_MS: '5000', POLL_MS: '50', REQUEST_RETRIES: '2',
+    SPOOL_DIR: mkdtempSync(join(tmpdir(), 'export-spool-')),
     ...overrides,
   };
 }

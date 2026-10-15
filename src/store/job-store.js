@@ -9,7 +9,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
  * crash recovery or another process), a stale worker can no longer change the row.
  */
 export class JobStore {
-  static COLUMNS = 'id, source, format, filters, notify_email, status, attempts, max_attempts, next_run_at, owner_token, lease_until, cancel_requested, rows, bytes, file_id, file_name, error_code, error, notify_status, created_by, created_at, started_at, finished_at, updated_at';
+  static COLUMNS = 'id, source, format, filters, notify_email, status, attempts, max_attempts, next_run_at, owner_token, lease_until, cancel_requested, rows, bytes, file_id, file_name, error_code, error, notify_status, created_by, created_at, started_at, finished_at, updated_at, checkpoint_cursor, checkpoint_rows, checkpoint_bytes';
 
   /** @param {Database} db */
   constructor(db) {
@@ -22,6 +22,9 @@ export class JobStore {
       due: db.prepare(`SELECT id FROM jobs WHERE status = 'queued' AND (next_run_at IS NULL OR next_run_at <= ?) ORDER BY id LIMIT ?`),
       start: db.prepare("UPDATE jobs SET status = 'running', attempts = attempts + 1, owner_token = ?, lease_until = ?, started_at = ?, next_run_at = NULL, rows = 0, bytes = 0, updated_at = ? WHERE id = ? AND status = 'queued'"),
       heartbeat: db.prepare(`UPDATE jobs SET lease_until = ?, rows = ?, bytes = ?, updated_at = ? ${fenced}`),
+      checkpoint: db.prepare(`UPDATE jobs SET checkpoint_cursor = ?, checkpoint_rows = ?, checkpoint_bytes = ?, rows = ?, bytes = ?, updated_at = ? ${fenced}`),
+      clearCheckpoint: db.prepare('UPDATE jobs SET checkpoint_cursor = NULL, checkpoint_rows = NULL, checkpoint_bytes = NULL WHERE id = ?'),
+      active: db.prepare("SELECT id FROM jobs WHERE status IN ('queued', 'running')"),
       cancelFlag: db.prepare('SELECT cancel_requested FROM jobs WHERE id = ?'),
       succeed: db.prepare(`UPDATE jobs SET status = 'succeeded', rows = ?, bytes = ?, file_id = ?, file_name = ?, error_code = NULL, error = NULL, owner_token = NULL, lease_until = NULL, finished_at = ?, updated_at = ? ${fenced}`),
       fail: db.prepare(`UPDATE jobs SET status = 'failed', rows = ?, bytes = ?, error_code = ?, error = ?, owner_token = NULL, lease_until = NULL, finished_at = ?, updated_at = ? ${fenced}`),
@@ -33,7 +36,7 @@ export class JobStore {
       expireToFail: db.prepare("UPDATE jobs SET status = 'failed', error_code = 'INTERRUPTED', error = ?, owner_token = NULL, lease_until = NULL, finished_at = ?, updated_at = ? WHERE id = ? AND status = 'running'"),
       cancelQueued: db.prepare("UPDATE jobs SET status = 'cancelled', finished_at = ?, updated_at = ? WHERE id = ? AND status = 'queued'"),
       requestCancel: db.prepare("UPDATE jobs SET cancel_requested = 1, updated_at = ? WHERE id = ? AND status = 'running'"),
-      retry: db.prepare("UPDATE jobs SET status = 'queued', attempts = 0, next_run_at = NULL, cancel_requested = 0, rows = 0, bytes = 0, file_id = NULL, file_name = NULL, error_code = NULL, error = NULL, notify_status = NULL, started_at = NULL, finished_at = NULL, updated_at = ? WHERE id = ? AND status IN ('failed', 'cancelled')"),
+      retry: db.prepare("UPDATE jobs SET status = 'queued', attempts = 0, next_run_at = NULL, cancel_requested = 0, rows = 0, bytes = 0, file_id = NULL, file_name = NULL, error_code = NULL, error = NULL, notify_status = NULL, started_at = NULL, finished_at = NULL, checkpoint_cursor = NULL, checkpoint_rows = NULL, checkpoint_bytes = NULL, updated_at = ? WHERE id = ? AND status IN ('failed', 'cancelled')"),
       delete: db.prepare("DELETE FROM jobs WHERE id = ? AND status <> 'running'"),
       notify: db.prepare('UPDATE jobs SET notify_status = ?, updated_at = ? WHERE id = ?'),
       purgeable: db.prepare(`SELECT ${C} FROM jobs WHERE finished_at IS NOT NULL AND finished_at < ? AND status IN ('succeeded', 'failed', 'cancelled') ORDER BY finished_at LIMIT ?`),
@@ -106,6 +109,24 @@ export class JobStore {
       }
       return out;
     });
+  }
+
+  /**
+   * Record that every row up to `rows` is safely in the spool file (`bytes` long); the next page starts at `cursor`.
+   * @param {string} id @param {string} token @param {{ cursor: string|null, rows: number, bytes: number }} c @param {number} now
+   */
+  checkpoint(id, token, c, now) {
+    return Number(this.stmt.checkpoint.run(c.cursor, c.rows, c.bytes, c.rows, c.bytes, now, id, token).changes) === 1;
+  }
+
+  /** @param {string} id */
+  clearCheckpoint(id) {
+    this.stmt.clearCheckpoint.run(id);
+  }
+
+  /** Ids of queued and running jobs (whose spool files must be kept). @returns {Set<string>} */
+  activeIds() {
+    return new Set(/** @type {{ id: string }[]} */ (this.stmt.active.all()).map((r) => r.id));
   }
 
   /** Renew the lease and record progress. False when the lease is gone. @param {string} id @param {string} token @param {number} leaseUntil @param {number} rows @param {number} bytes @param {number} now */

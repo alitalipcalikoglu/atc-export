@@ -19,6 +19,7 @@
  * @property {number} requestRetries      Retries per upstream request on transient errors.
  * @property {number} upstreamTimeoutMs   Per source request.
  * @property {number} uploadTimeoutMs     Whole upload of one export.
+ * @property {string} spoolDir            Local files the export is written to page by page before the upload; a rerun resumes from the last page.
  */
 
 /**
@@ -78,6 +79,9 @@
  * @property {number|null} started_at
  * @property {number|null} finished_at
  * @property {number} updated_at
+ * @property {string|null} checkpoint_cursor  Cursor of the next source page; null with checkpoint_bytes set = every page is spooled.
+ * @property {number|null} checkpoint_rows
+ * @property {number|null} checkpoint_bytes    Size of the spool file at the checkpoint; null = no checkpoint.
  */
 
 /**

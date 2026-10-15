@@ -65,25 +65,40 @@ export class Source {
     return item;
   }
 
+  /** Whether {@link pages} can start at a saved cursor, so an interrupted export resumes there. */
+  get resumable() { return true; }
+
   /**
-   * Pages through the list endpoint with its cursor until it runs out.
+   * Pages of the list endpoint from `cursor` (null = the first page) until it runs out. `next` is
+   * the cursor of the page after this one, null on the last.
+   * @param {Record<string, string>} filters
+   * @param {AbortSignal} signal
+   * @param {string|null} [cursor]
+   * @returns {AsyncGenerator<{ items: Record<string, unknown>[], next: string|null }>}
+   */
+  async *pages(filters, signal, cursor = null) {
+    const seen = new Set();
+    do {
+      const sep = this.listPath(filters).includes('?') ? '&' : '?';
+      const page = /** @type {Record<string, any> & { items: Record<string, unknown>[] }} */ (await this.http.json(`${this.listPath(filters)}${sep}limit=${this.pageSize}${cursor ? `&${this.cursorParam}=${encodeURIComponent(cursor)}` : ''}`, signal));
+      /** @type {string|null} */
+      const next = page[this.nextField] ?? null;
+      // A cursor that repeats would loop forever; treat it as an upstream fault.
+      if (next !== null && (seen.has(next) || next === cursor)) throw new ExportError('UPSTREAM_ERROR', `${this.id} returned a repeating cursor`);
+      if (next !== null) seen.add(next);
+      yield { items: page.items.map((item) => this.record(item, filters)), next };
+      cursor = next;
+    } while (cursor !== null);
+  }
+
+  /**
+   * Every row, page after page.
    * @param {Record<string, string>} filters
    * @param {AbortSignal} signal
    * @returns {AsyncGenerator<Record<string, unknown>>}
    */
   async *rows(filters, signal) {
-    /** @type {string|null} */
-    let cursor = null;
-    const seen = new Set();
-    do {
-      const sep = this.listPath(filters).includes('?') ? '&' : '?';
-      const page = /** @type {Record<string, any> & { items: Record<string, unknown>[] }} */ (await this.http.json(`${this.listPath(filters)}${sep}limit=${this.pageSize}${cursor ? `&${this.cursorParam}=${encodeURIComponent(cursor)}` : ''}`, signal));
-      for (const item of page.items) yield this.record(item, filters);
-      cursor = page[this.nextField] ?? null;
-      // A cursor that repeats would loop forever; treat it as an upstream fault.
-      if (cursor !== null && seen.has(cursor)) throw new ExportError('UPSTREAM_ERROR', `${this.id} returned a repeating cursor`);
-      if (cursor !== null) seen.add(cursor);
-    } while (cursor !== null);
+    for await (const page of this.pages(filters, signal)) yield* page.items;
   }
 
   /** @param {Record<string, string>} q */

@@ -72,6 +72,7 @@ export class Application {
     this.audit.start();
     await app.listen({ port: config.port, host: config.host });
     app.log.info({ tls: config.tls !== null, sources: Object.keys(config.sources), notify: config.notify !== null }, config.tls ? 'serving HTTPS' : 'serving plain HTTP, terminate TLS at a reverse proxy');
+    await worker.prepare();
     worker.start();
     if (process.send) process.send('ready'); // PM2 wait_ready
   }

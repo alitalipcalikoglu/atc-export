@@ -34,5 +34,12 @@ export class Database extends CoreDatabase {
     CREATE INDEX jobs_due ON jobs (status, next_run_at);
     CREATE INDEX jobs_finished ON jobs (finished_at) WHERE finished_at IS NOT NULL;
     `,
+    `
+    -- Resume: after each source page the spooled bytes and the next cursor are recorded; a rerun
+    -- truncates the spool file to checkpoint_bytes and continues from checkpoint_cursor.
+    ALTER TABLE jobs ADD COLUMN checkpoint_cursor TEXT;
+    ALTER TABLE jobs ADD COLUMN checkpoint_rows INTEGER;
+    ALTER TABLE jobs ADD COLUMN checkpoint_bytes INTEGER;
+    `,
   ];
 }

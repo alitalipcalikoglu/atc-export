@@ -85,10 +85,11 @@ export class Config {
         requestRetries: r.integer('REQUEST_RETRIES', 3, { min: 0, max: 10 }),
         upstreamTimeoutMs: r.integer('UPSTREAM_TIMEOUT_MS', 15_000, { min: 500 }),
         uploadTimeoutMs: r.integer('UPLOAD_TIMEOUT_MS', 600_000, { min: 5_000 }),
+        spoolDir: r.optional('SPOOL_DIR') || './data/spool',
       },
       limits: {
-        maxRows: r.integer('EXPORT_MAX_ROWS', 100_000, { min: 1 }),
-        maxBytes: r.integer('EXPORT_MAX_BYTES', 20_971_520, { min: 1_024 }),
+        maxRows: r.integer('EXPORT_MAX_ROWS', 1_000_000, { min: 1 }),
+        maxBytes: r.integer('EXPORT_MAX_BYTES', 268_435_456, { min: 1_024 }),
         retentionDays: r.integer('EXPORT_RETENTION_DAYS', 7, { min: 1 }),
         downloadTtlSec: r.integer('DOWNLOAD_TTL_SEC', 300, { min: 30, max: 86_400 }),
       },

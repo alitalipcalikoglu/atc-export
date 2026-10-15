@@ -10,7 +10,17 @@ The worker runs in the service process. Every `POLL_MS` it claims due jobs up to
 | Transient per run | still failing after those retries; media 5xx during upload | Job back to `queued` with `nextRunAt` (30 s, 60 s, 120 s ... up to 10 min) until `MAX_ATTEMPTS` (3) |
 | Permanent | 4xx from the source or media, `TOO_MANY_ROWS`, `TOO_LARGE`, bad filter at run time | `failed` at once |
 
-A rerun starts the export from the beginning and uploads a fresh file; nothing partial is ever kept.
+## Resume
+
+Rows go to a local spool file (`SPOOL_DIR/<job id>.csv`) one source page at a time. After each page the file is synced and the job records a checkpoint: the cursor of the next page, the rows and the bytes so far. When a run is interrupted (a transient failure, a restart, a lost lease) the next run cuts the spool file back to the checkpoint and asks the source only for the pages after it:
+
+```
+{"level":30,"job":"exp_…","rows":60000,"bytes":7340032,"msg":"export resumed from its checkpoint"}
+```
+
+`/metrics` counts these in `export_worker_events_total{event="resumed"}`. If the spool file is gone or shorter than the checkpoint (another disk, wiped data), the run starts over. `atc-audit` exports are one streamed response without pages, so they always start over. The upload itself is not resumable: a failed upload sends the whole spool file again on the next run.
+
+Media receives only finished files; nothing partial is uploaded. The spool file is deleted when the job succeeds, fails or is cancelled, and the hourly retention pass removes spool files of jobs that no longer exist.
 
 ## Crash and restart
 

@@ -10,7 +10,8 @@ Scenario-driven walkthroughs of every feature. Requests to `/v1/*` need `Authori
 | [Progress, cancel and retry](progress-cancel-retry.md) | Job states, polling progress, cancelling a running export, retrying a failed one |
 | [Downloading the file](downloads.md) | Short-lived signed URLs, why the file is private, deleting a job |
 | [Completion e-mails](notifications.md) | `notifyEmail`, the notify template used, what the mail says |
-| [Worker, failures and recovery](worker.md) | Leases, heartbeats, transient vs permanent errors, restarts, shutdown |
+| [Worker, failures and recovery](worker.md) | Leases, heartbeats, transient vs permanent errors, resuming from the last page, restarts, shutdown |
+| [Scheduled exports](scheduling.md) | Nightly and weekly exports through atc-scheduler, idempotent runs, picking up the file |
 | [Retention](retention.md) | How long jobs and files are kept |
 | [API keys and roles](keys-and-roles.md) | Read, write, readwrite |
 | [Operations](operations.md) | Health, readiness, metrics, stats, PM2, Docker, backups |

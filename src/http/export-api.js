@@ -155,7 +155,7 @@ export class ExportApi {
         ...Object.entries(st.bySource).map(([src, m]) => `export_jobs_by_source{source="${label(src)}"} ${Object.values(m).reduce((a, b) => a + b, 0)}`),
         '# HELP export_worker_events_total Worker outcomes since start (process-local).',
         '# TYPE export_worker_events_total counter',
-        ...['succeeded', 'failed', 'retried', 'cancelled', 'purged'].map((k) => `export_worker_events_total{event="${k}"} ${c[/** @type {keyof typeof c} */ (k)]}`),
+        ...['succeeded', 'failed', 'retried', 'resumed', 'cancelled', 'purged'].map((k) => `export_worker_events_total{event="${k}"} ${c[/** @type {keyof typeof c} */ (k)]}`),
         '# HELP export_worker_in_flight Jobs this process is running now.',
         '# TYPE export_worker_in_flight gauge',
         `export_worker_in_flight ${this.worker.inFlight.size}`,

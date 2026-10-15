@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fakeUpstream, testSystem } from './helpers.js';
@@ -167,4 +169,50 @@ test('retention: finished jobs and their files are purged after EXPORT_RETENTION
   assert.ok(sys.jobs.get(queued.id));
   assert.equal(up.state.files.has(fileId), false);
   assert.ok(up.state.deleted.includes(fileId));
+});
+
+test('worker: a transient failure mid-run resumes from the last page instead of starting over', async () => {
+  let now = 1_800_000_000_000;
+  const { service, worker, jobs, config } = testSystem(up.url, { REQUEST_RETRIES: '0' }, { now: () => now });
+  const j = service.create({ source: 'atc-auth', format: 'csv' }, 'x');
+  up.state.failCursor = '6';
+  await worker.tick();
+  let r = /** @type {any} */ (jobs.get(j.id));
+  assert.deepEqual([r.status, r.checkpoint_rows, r.checkpoint_cursor], ['queued', 6, '6'], 'two pages of three are checkpointed');
+  const spool = join(config.worker.spoolDir, `${j.id}.csv`);
+  assert.equal(existsSync(spool), true);
+  up.state.failCursor = '';
+  up.state.seen = [];
+  now += 30_000;
+  await worker.tick();
+  r = /** @type {any} */ (jobs.get(j.id));
+  assert.equal(r.status, 'succeeded', r.error);
+  assert.equal(r.rows, 7);
+  const userCalls = up.state.seen.filter((x) => x.url.startsWith('/v1/users'));
+  assert.deepEqual(userCalls.map((x) => new URL(x.url, 'http://x').searchParams.get('cursor')), ['6'], 'only the missing page was read');
+  const body = /** @type {any} */ (up.state.files.get(r.file_id)).body;
+  assert.equal(body.split('\r\n').length, 9, 'header + 7 rows, nothing duplicated');
+  assert.deepEqual(body.split('\r\n').slice(1, 8).map((/** @type {string} */ l) => l.split(',')[0]), ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7']);
+  assert.equal(existsSync(spool), false, 'spool removed after success');
+  assert.equal(r.checkpoint_bytes, null);
+  assert.equal(worker.counters.resumed, 1);
+});
+
+test('worker: a missing spool file restarts the export; purge removes orphan spool files', async () => {
+  let now = 1_800_000_000_000;
+  const { service, worker, jobs, config } = testSystem(up.url, { REQUEST_RETRIES: '0' }, { now: () => now });
+  const j = service.create({ source: 'atc-auth', format: 'csv' }, 'x');
+  up.state.failCursor = '3';
+  await worker.tick();
+  assert.equal(/** @type {any} */ (jobs.get(j.id)).checkpoint_rows, 3);
+  for (const f of readdirSync(config.worker.spoolDir)) writeFileSync(join(config.worker.spoolDir, f), ''); // shorter than the checkpoint
+  up.state.failCursor = '';
+  now += 30_000;
+  await worker.tick();
+  const r = /** @type {any} */ (jobs.get(j.id));
+  assert.deepEqual([r.status, r.rows], ['succeeded', 7]);
+  assert.equal(worker.counters.resumed, 0);
+  writeFileSync(join(config.worker.spoolDir, 'gone.csv'), 'x');
+  await worker.purge(now);
+  assert.deepEqual(readdirSync(config.worker.spoolDir), []);
 });

@@ -27,7 +27,7 @@ docker build -t atc-export .
 docker run -p 3014:3014 -v atc-export-data:/data --env-file .env atc-export
 ```
 
-atc-media must accept the files: add `text/csv,application/x-ndjson` to its `ALLOWED_TYPES` (opt-in there) and keep its `MAX_UPLOAD_BYTES` at or above `EXPORT_MAX_BYTES`.
+atc-media must accept the files: add `text/csv,application/x-ndjson` to its `ALLOWED_TYPES` (opt-in there) and accept uploads of `EXPORT_MAX_BYTES` from this service's key (`KEY_MAX_UPLOAD_BYTES=atc-export:<bytes>`, or a `MAX_UPLOAD_BYTES` at least that large).
 
 Tests and type check:
 
@@ -38,9 +38,9 @@ npm run typecheck
 
 ## Model
 
-- **Job**: `queued → running → succeeded | failed | cancelled`. Transient failures (network, timeout, 408/429/5xx) send it back to `queued` with a backoff until `MAX_ATTEMPTS`; permanent ones (4xx, caps) fail at once. `retry` queues a failed or cancelled job again from scratch; `cancel` stops a queued job at once and a running one at its next heartbeat.
+- **Job**: `queued → running → succeeded | failed | cancelled`. Transient failures (network, timeout, 408/429/5xx) send it back to `queued` with a backoff until `MAX_ATTEMPTS`; permanent ones (4xx, caps) fail at once. `retry` queues a failed or cancelled job again from scratch (a failed or cancelled job keeps no checkpoint); `cancel` stops a queued job at once and a running one at its next heartbeat.
 - **Worker**: in-process, `WORKER_CONCURRENCY` jobs at a time. Each claim carries an owner token and a lease that a heartbeat renews; every finishing write is fenced on the token. Expired leases (crash, hang) are reclaimed; on shutdown running jobs go back to the queue.
-- **Output**: streamed in 64 KiB chunks straight into `PUT /v1/files` of atc-media as a private file; nothing is buffered whole and nothing partial is kept.
+- **Output**: written page by page to a local spool file (`SPOOL_DIR`), with a checkpoint (next cursor, rows, bytes) after every page; then streamed in 64 KiB chunks into `PUT /v1/files` of atc-media as a private file. A rerun after a transient failure, a restart or a lost lease truncates the spool to the last checkpoint and continues from the saved cursor, so a large export does not read its source again. `atc-audit` (one streamed response, no pages) starts over. The spool file is removed when the job finishes.
 - **Sources**: only those with `SOURCE_<NAME>_URL` and `SOURCE_<NAME>_API_KEY` are offered (`GET /v1/sources` lists them with their filters and CSV columns).
 
 | Source | Reads | Filters |
@@ -102,7 +102,8 @@ All configuration is environment variables; [.env.example](.env.example) documen
 | `LEASE_MS`, `HEARTBEAT_MS`, `DRAIN_MS` | `60000`, `15000`, `10000` | Lease, heartbeat (≤ half the lease), shutdown hand-back window (≤ 25 s) |
 | `MAX_ATTEMPTS`, `REQUEST_RETRIES` | `3`, `3` | Runs per job; retries per source request |
 | `UPSTREAM_TIMEOUT_MS`, `UPLOAD_TIMEOUT_MS` | `15000`, `600000` | Per source request; per upload |
-| `EXPORT_MAX_ROWS`, `EXPORT_MAX_BYTES` | `100000`, `20971520` | Caps per export |
+| `EXPORT_MAX_ROWS`, `EXPORT_MAX_BYTES` | `1000000`, `268435456` | Caps per export (256 MiB); atc-media must accept uploads that large from this key (`KEY_MAX_UPLOAD_BYTES` there) |
+| `SPOOL_DIR` | `./data/spool` | Local spool files and resume checkpoints; needs free space for the largest export in flight (times `WORKER_CONCURRENCY`) |
 | `EXPORT_RETENTION_DAYS` | `7` | Finished jobs and files are deleted after this |
 | `DOWNLOAD_TTL_SEC` | `300` | Signed URL lifetime |
 | `DB_PATH`, `DB_BACKUP_DIR` | `./data/export.db` | SQLite file; pre-migration snapshot directory |
@@ -142,9 +143,9 @@ examples/, docs/READINESS.md
 ## Out of scope by design
 
 - Spreadsheet formats (XLSX), compression, encryption at rest beyond what media provides.
-- Scheduled or recurring exports in the service itself: atc-scheduler calls `POST /v1/exports` (see the scheduler's `examples/internal-services.md`).
+- Scheduled or recurring exports in the service itself: atc-scheduler calls `POST /v1/exports` (see [examples/scheduling.md](examples/scheduling.md)).
 - Exporting a service that has no paged list API, or file contents from media.
-- Resuming a run mid-file: a rerun starts from the beginning.
+- Resuming an `atc-audit` export mid-run (its source is one streamed response) or an upload mid-file (the spool is uploaded again whole).
 - An API/worker process split; the worker always runs in the service process.
 
 ## Audit events

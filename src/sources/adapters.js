@@ -31,6 +31,9 @@ export class AuditEventsSource extends Source {
     return { seq: e.seq, id: e.id, at: e.at, source: e.source, action: e.action, outcome: e.outcome, actorType: actor?.type ?? null, actorId: actor?.id ?? null, targetType: target?.type ?? null, targetId: target?.id ?? null, ip: e.ip ?? null, userAgent: e.userAgent ?? null, requestId: e.requestId ?? null, meta: e.meta ?? null };
   }
 
+  /** One streamed response, no pages: an interrupted export of audit events starts over. */
+  get resumable() { return false; }
+
   /**
    * Streams NDJSON line by line; never holds more than one network chunk plus one partial line.
    * @param {Record<string, string>} filters
