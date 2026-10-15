@@ -127,3 +127,12 @@ test('sources: payments, ledger, queue dead letters, scheduler runs and webhook 
   assert.throws(() => sources.get('atc-scheduler').validate({ job: 'Bad Name' }), fails('INVALID_FILTER'));
   assert.throws(() => sources.get('atc-webhook-out').validate({ subscription: 'x' }), fails('INVALID_FILTER'));
 });
+
+test('sources: notify messages and suppressions need SOURCE_NOTIFY_*; recipients become one column', async () => {
+  const { NotifyMessagesSource } = await import('../src/sources/adapters.js');
+  const { sources } = testSystem(up.url, { SOURCE_NOTIFY_URL: up.url, SOURCE_NOTIFY_API_KEY: 'u'.repeat(40) });
+  assert.ok(['atc-notify', 'atc-notify-suppressions'].every((id) => sources.list().some((s) => s.id === id)));
+  assert.throws(() => sources.get('atc-notify').validate({ status: 'bogus' }), fails('INVALID_FILTER'));
+  const row = NotifyMessagesSource.prototype.record.call(Object.create(NotifyMessagesSource.prototype), { id: 'm1', to: ['a@x.io', 'b@x.io'], status: 'sent', data: { secret: 1 } });
+  assert.deepEqual([row.to, row.status, 'data' in row], ['a@x.io b@x.io', 'sent', false]);
+});

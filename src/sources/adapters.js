@@ -277,6 +277,30 @@ export class WebhookDeliveriesSource extends Source {
   record(d) { return Object.fromEntries(this.columns.map((c) => [c, d[c] ?? null])); }
 }
 
+/** Notify messages of every sender (needs an admin key on notify). Template data is never exported: notify does not return it. */
+export class NotifyMessagesSource extends Source {
+  get id() { return 'atc-notify'; }
+  get label() { return 'Notify messages'; }
+  /** @returns {Record<string, FilterSpec>} */
+  get filters() { return { status: { type: 'string', enum: ['queued', 'processing', 'sent', 'failed'], description: 'Delivery status.' } }; }
+  get columns() { return ['id', 'keyId', 'channel', 'status', 'template', 'to', 'attempts', 'lastError', 'providerId', 'createdAt', 'sentAt']; }
+  /** @param {Record<string, string>} f */
+  listPath(f) { return `/v1/messages${Source.query({ status: f.status })}`; }
+  /** @param {Record<string, unknown>} m */
+  record(m) { return Object.fromEntries(this.columns.map((c) => [c, c === 'to' && Array.isArray(m.to) ? m.to.join(' ') : m[c] ?? null])); }
+}
+
+/** Notify's suppression list (admin key). */
+export class NotifySuppressionsSource extends Source {
+  get id() { return 'atc-notify-suppressions'; }
+  get label() { return 'Suppressed addresses'; }
+  get pageSize() { return 200; }
+  get columns() { return ['email', 'reason', 'source', 'note', 'createdAt']; }
+  listPath() { return '/v1/suppressions'; }
+  /** @param {Record<string, unknown>} s */
+  record(s) { return Object.fromEntries(this.columns.map((c) => [c, s[c] ?? null])); }
+}
+
 /** The adapters this build knows, by source id. */
 export const ADAPTERS = /** @type {const} */ ({
   'atc-audit': AuditEventsSource,
@@ -292,4 +316,6 @@ export const ADAPTERS = /** @type {const} */ ({
   'atc-queue': QueueMessagesSource,
   'atc-scheduler': SchedulerRunsSource,
   'atc-webhook-out': WebhookDeliveriesSource,
+  'atc-notify': NotifyMessagesSource,
+  'atc-notify-suppressions': NotifySuppressionsSource,
 });

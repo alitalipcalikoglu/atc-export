@@ -58,6 +58,8 @@ npm run typecheck
 | `atc-queue` | `GET /v1/queues/:q/messages` | `queue`*, `state` (dead letters by default) |
 | `atc-scheduler` | `GET /v1/runs` | `job`, `status` |
 | `atc-webhook-out` | `GET /v1/deliveries` | `status`, `subscription` |
+| `atc-notify` | `GET /v1/messages` | `status` |
+| `atc-notify-suppressions` | `GET /v1/suppressions` | – |
 
 ## API
 
