@@ -38,17 +38,17 @@ export class ServiceHttp {
    * Request with retries. Returns the successful response; the caller consumes its body.
    * @param {string} method
    * @param {string} path
-   * @param {{ signal: AbortSignal, body?: unknown, timeoutMs?: number, retry?: boolean }} o
+   * @param {{ signal: AbortSignal, body?: unknown, timeoutMs?: number, retry?: boolean, headers?: Record<string, string> }} o
    * @returns {Promise<Response>}
    */
-  async request(method, path, { signal, body, timeoutMs = this.timeoutMs, retry = true }) {
+  async request(method, path, { signal, body, timeoutMs = this.timeoutMs, retry = true, headers = {} }) {
     for (let attempt = 0; ; attempt++) {
       signal.throwIfAborted();
       let res;
       try {
         res = await this.fetch(`${this.upstream.url}${path}`, {
           method,
-          headers: { authorization: `Bearer ${this.upstream.apiKey}`, accept: 'application/json, application/x-ndjson', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+          headers: { authorization: `Bearer ${this.upstream.apiKey}`, accept: 'application/json, application/x-ndjson', ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...headers },
           body: body === undefined ? undefined : JSON.stringify(body),
           redirect: 'error',
           signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),

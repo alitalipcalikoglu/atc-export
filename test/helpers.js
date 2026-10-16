@@ -94,7 +94,7 @@ export async function fakeUpstream() {
     if (p === '/v1/messages') {
       let b = '';
       req.on('data', (c) => { b += c; });
-      req.on('end', () => { if (state.mailStatus) return json(state.mailStatus, {}); state.mails.push(JSON.parse(b)); json(202, { id: 'm1' }); });
+      req.on('end', () => { if (state.mailStatus) return json(state.mailStatus, {}); state.mails.push({ ...JSON.parse(b), idempotencyKey: req.headers['idempotency-key'] }); json(202, { id: 'm1' }); });
       return;
     }
     json(404, { error: { code: 'NOT_FOUND', message: p } });

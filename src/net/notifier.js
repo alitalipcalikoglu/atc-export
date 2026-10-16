@@ -26,11 +26,11 @@ export class Notifier {
     const size = result.bytes >= 1_048_576 ? `${(result.bytes / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(result.bytes / 1024))} KB`;
     await this.http.request('POST', '/v1/messages', {
       signal: AbortSignal.timeout(this.http.timeoutMs),
+      headers: { 'idempotency-key': `atc-export:${job.id}:${job.attempts}` },
       body: {
         channel: 'email',
         template: 'generic',
         to: [job.notify_email],
-        idempotencyKey: `atc-export:${job.id}:${job.attempts}`,
         data: {
           locale: 'en',
           appName: this.appName,
