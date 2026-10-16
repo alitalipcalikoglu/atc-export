@@ -1,6 +1,6 @@
 {
   "name": "@atc-web/atc-export",
-  "version": "1.31.0",
+  "version": "1.32.0",
   "private": true,
   "description": "Background data exports to files: source adapters over the platform list APIs, CSV/NDJSON streamed into private media files, durable leased worker, retention",
   "license": "MIT",
@@ -20,7 +20,7 @@
     "typecheck": "tsc -p jsconfig.json"
   },
   "dependencies": {
-    "@atc-web/atc-service-core": "github:alitalipcalikoglu/atc-service-core#v1.31.0",
+    "@atc-web/atc-service-core": "github:alitalipcalikoglu/atc-service-core#v1.32.0",
     "@fastify/rate-limit": "11.2.0",
     "fastify": "5.12.5"
   },
