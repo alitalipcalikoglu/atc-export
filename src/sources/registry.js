@@ -31,6 +31,6 @@ export class SourceRegistry {
   }
 
   list() {
-    return [...this.byId.values()].map((s) => ({ id: s.id, label: s.label, formats: ['csv', 'ndjson'], columns: s.columns, filters: s.filters }));
+    return [...this.byId.values()].map((s) => ({ id: s.id, label: s.label, formats: ['csv', 'ndjson'], columns: s.columns, filters: s.filters, personal: s.personal }));
   }
 }

@@ -29,8 +29,8 @@ Only sources whose `SOURCE_<NAME>_URL` and `SOURCE_<NAME>_API_KEY` are both set 
 | `atc-queue` | `GET /v1/queues/:q/messages` | `queue` (required), `state` | Dead letters unless `state` says otherwise; includes message bodies (application data) |
 | `atc-scheduler` | `GET /v1/runs` | `job`, `status` | Newest first; attempt logs are left out |
 | `atc-webhook-out` | `GET /v1/deliveries` | `status`, `subscription` | Newest first; response bodies and attempt logs are left out |
-| `atc-notify` | `GET /v1/messages` | `status` | Every sender's messages: `SOURCE_NOTIFY_API_KEY` must be an `admin` key on notify; recipients in `to`, never the template data |
-| `atc-notify-suppressions` | `GET /v1/suppressions` | – | The suppression list (same admin key) |
+| `atc-notify` | `GET /v1/messages` | `status` | **Personal data.** Every sender's recipients (`to`, never the template data): `SOURCE_NOTIFY_API_KEY` must be an `admin` key on notify, and only an `admin` export key may create this export (`403 FORBIDDEN` for `write`/`readwrite`); the listing says `personal: true` |
+| `atc-notify-suppressions` | `GET /v1/suppressions` | – | **Personal data.** The suppression list; same two admin keys |
 
 ## Scenario: hand untranslated Turkish strings to a translator
 

@@ -2,7 +2,7 @@ import { AuditClient } from '@atc-web/atc-service-core/audit';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, before, test } from 'node:test';
-import { READ_KEY, RW_KEY, WRITE_KEY, bearer, buildApp, fakeUpstream } from './helpers.js';
+import { READ_KEY, RW_KEY, UP_KEY, WRITE_KEY, bearer, buildApp, fakeUpstream } from './helpers.js';
 
 const json = (/** @type {import('light-my-request').Response} */ r) => JSON.parse(r.body);
 const PACKAGE_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -99,4 +99,18 @@ test('API: X-Actor names the creator only for ACTOR_KEYS keys', async (t) => {
   const [named, plain] = audit.buffer;
   assert.deepEqual([named.actor, /** @type {any} */ (named.meta)?.via], [{ type: 'admin', id: 'ayse.k' }, 'console'], 'audit names the admin, the key stays in meta.via');
   assert.deepEqual([plain.actor?.type, /** @type {any} */ (plain.meta)?.via], ['apikey', undefined]);
+});
+
+test('API: personal-data sources (notify recipients, suppressions) need an admin export key', async (t) => {
+  const ADMIN_KEY = 'z'.repeat(40);
+  const { app } = await buildApp(up.url, { EXPORT_API_KEYS: `console:${RW_KEY},ops:${WRITE_KEY}:write,root:${ADMIN_KEY}:admin`, SOURCE_NOTIFY_URL: up.url, SOURCE_NOTIFY_API_KEY: UP_KEY });
+  t.after(() => app.close());
+  const sources = json(await app.inject({ url: '/v1/sources', headers: bearer(RW_KEY) })).items;
+  assert.deepEqual(sources.filter((/** @type {any} */ s) => s.personal).map((/** @type {any} */ s) => s.id), ['atc-notify', 'atc-notify-suppressions']);
+  for (const key of [RW_KEY, WRITE_KEY]) {
+    const res = await app.inject({ method: 'POST', url: '/v1/exports', headers: bearer(key), payload: { source: 'atc-notify-suppressions', format: 'csv' } });
+    assert.deepEqual([res.statusCode, json(res).error.code], [403, 'FORBIDDEN'], 'readwrite and write keys cannot export personal data');
+  }
+  assert.equal((await app.inject({ method: 'POST', url: '/v1/exports', headers: bearer(ADMIN_KEY), payload: { source: 'atc-notify-suppressions', format: 'csv' } })).statusCode, 202);
+  assert.equal((await app.inject({ method: 'POST', url: '/v1/exports', headers: bearer(WRITE_KEY), payload: { source: 'atc-auth', format: 'csv' } })).statusCode, 202, 'other sources are unchanged');
 });

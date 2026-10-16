@@ -280,6 +280,7 @@ export class WebhookDeliveriesSource extends Source {
 export class NotifyMessagesSource extends Source {
   get id() { return 'atc-notify'; }
   get label() { return 'Notify messages'; }
+  get personal() { return true; }
   /** @returns {Record<string, FilterSpec>} */
   get filters() { return { status: { type: 'string', enum: ['queued', 'processing', 'sent', 'failed'], description: 'Delivery status.' } }; }
   get columns() { return ['id', 'keyId', 'channel', 'status', 'template', 'to', 'attempts', 'lastError', 'providerId', 'createdAt', 'sentAt']; }
@@ -293,6 +294,7 @@ export class NotifyMessagesSource extends Source {
 export class NotifySuppressionsSource extends Source {
   get id() { return 'atc-notify-suppressions'; }
   get label() { return 'Suppressed addresses'; }
+  get personal() { return true; }
   get pageSize() { return 200; }
   get columns() { return ['email', 'reason', 'source', 'note', 'createdAt']; }
   listPath() { return '/v1/suppressions'; }

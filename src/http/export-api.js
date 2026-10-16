@@ -101,7 +101,7 @@ export class ExportApi {
     api.get('/sources', read, async () => ({ items: this.sources.list(), nextCursor: null }));
 
     api.post('/exports', { config: { idempotent: true, audit: AuditClient.route('atc-export.export.create', (_r, b) => ({ type: 'export', id: b.export.id }), (_r, b) => ({ source: b.export.source, format: b.export.format, filters: b.export.filters, notify: Boolean(b.export.notifyEmail) })) }, ...write, schema: { body: Schemas.create } }, async (request, reply) => {
-      const j = s.create(/** @type {any} */ (request.body), who.of(request));
+      const j = s.create(/** @type {any} */ (request.body), who.of(request), request.apiKey.role);
       reply.header('location', `/v1/exports/${j.id}`);
       return reply.code(202).send(view(j));
     });

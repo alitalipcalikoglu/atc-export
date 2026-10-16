@@ -16,6 +16,7 @@ export class Source {
   /** @returns {string} */ get id() { throw new Error('abstract'); }
   /** @returns {string} */ get label() { throw new Error('abstract'); }
   /** @returns {Record<string, FilterSpec>} */ get filters() { return {}; }
+  /** Rows are personal data of people outside the platform (addresses, recipients): only an `admin` export key may export them. */ get personal() { return false; }
   /** @returns {string[]} */ get columns() { throw new Error('abstract'); }
   /** Page size the owning service accepts. */ get pageSize() { return 100; }
   /** Query parameter that carries the cursor, and the response field that holds the next one (every platform list uses `cursor`/`nextCursor`). */

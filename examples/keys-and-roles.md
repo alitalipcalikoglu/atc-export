@@ -7,6 +7,7 @@
 | `read` | sources, list, get, download URL, stats, metrics |
 | `write` | create, cancel, retry, delete |
 | `readwrite` (default) | both |
+| `admin` | both, plus exports of sources marked `personal` (notify recipients, the suppression list): data about people outside the platform, under data-protection rules |
 
 ```
 EXPORT_API_KEYS=atc-console:<64 hex>,reporting:<64 hex>:read,nightly-job:<64 hex>:write

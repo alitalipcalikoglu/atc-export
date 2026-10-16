@@ -2,7 +2,7 @@
  * Shared JSDoc typedefs for the export service. No runtime exports.
  */
 
-/** @typedef {'read'|'write'|'readwrite'} KeyRole */
+/** @typedef {'read'|'write'|'readwrite'|'admin'} KeyRole */
 /** @typedef {{ id: string, secret: string, role: KeyRole }} ApiKey */
 /** @typedef {{ url: string, apiKey: string }} Upstream */
 /** @typedef {'csv'|'ndjson'} Format */

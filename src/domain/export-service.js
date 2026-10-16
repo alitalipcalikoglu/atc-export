@@ -36,9 +36,11 @@ export class ExportService {
   /**
    * @param {{ source: string, format: 'csv'|'ndjson', filters?: unknown, notifyEmail?: string }} input
    * @param {string} actor
+   * @param {import('../types.js').KeyRole} [role]  The caller's role; personal-data sources need `admin`.
    */
-  create(input, actor) {
+  create(input, actor, role = 'admin') {
     const source = this.sources.get(input.source);
+    if (source.personal && role !== 'admin') throw new ExportError('FORBIDDEN', `${source.id} holds personal data; exporting it needs an admin key`);
     const filters = source.validate(input.filters);
     if (input.notifyEmail && !this.notifier.enabled) throw new ExportError('NOTIFY_DISABLED', 'completion e-mails need NOTIFY_URL and NOTIFY_API_KEY on the export service');
     return this.jobs.insert({ source: source.id, format: input.format, filters, notifyEmail: input.notifyEmail || null, maxAttempts: this.options.maxAttempts, createdBy: actor }, this.now());

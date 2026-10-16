@@ -132,7 +132,7 @@ export class Config {
    * @returns {ApiKey[]}
    */
   static #parseApiKeys(raw) {
-    return parseApiKeys(raw, 'EXPORT_API_KEYS', { roles: ['read', 'write', 'readwrite'], minSecretLength: Config.MIN_SECRET_LENGTH, roleErrorMessage: () => 'must be read, write or readwrite' })
+    return parseApiKeys(raw, 'EXPORT_API_KEYS', { roles: ['read', 'write', 'readwrite', 'admin'], minSecretLength: Config.MIN_SECRET_LENGTH, roleErrorMessage: () => 'must be read, write, readwrite or admin' })
       .map(({ id, secret, role }) => ({ id, secret, role: /** @type {KeyRole} */ (role) }));
   }
 }

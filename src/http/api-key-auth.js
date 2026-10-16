@@ -3,7 +3,7 @@ import { ExportError } from '../domain/errors.js';
 
 /** @typedef {import('../types.js').ApiKey} ApiKey */
 
-/** Bearer API-key authentication with read/write roles. Thin wrapper over service-core's `ApiKeyAuth`. */
+/** Bearer API-key authentication with read/write/admin roles. Thin wrapper over service-core's `ApiKeyAuth`. */
 export class ApiKeyAuth {
   /** @param {ApiKey[]} apiKeys */
   constructor(apiKeys) {
@@ -15,9 +15,13 @@ export class ApiKeyAuth {
     return this.core.hook;
   }
 
-  /** @param {'read'|'write'} need */
+  /** `admin` does everything and is the only role that may export personal data (sources marked `personal`). */
+  static GRANTS = Object.freeze({ read: ['read', 'readwrite', 'admin'], write: ['write', 'readwrite', 'admin'], admin: ['admin'] });
+
+  /** @param {'read'|'write'|'admin'} need */
   static require(need) {
     return CoreApiKeyAuth.require(need, {
+      grants: ApiKeyAuth.GRANTS,
       roleOf: (request) => /** @type {any} */ (request).apiKey?.role,
       makeError: (n) => new ExportError('FORBIDDEN', `this API key has no ${n} access`),
     });

@@ -58,8 +58,8 @@ npm run typecheck
 | `atc-queue` | `GET /v1/queues/:q/messages` | `queue`*, `state` (dead letters by default) |
 | `atc-scheduler` | `GET /v1/runs` | `job`, `status` |
 | `atc-webhook-out` | `GET /v1/deliveries` | `status`, `subscription` |
-| `atc-notify` | `GET /v1/messages` | `status` |
-| `atc-notify-suppressions` | `GET /v1/suppressions` | – |
+| `atc-notify` | `GET /v1/messages` | `status` — **personal data** (every sender's recipients), `admin` export keys only |
+| `atc-notify-suppressions` | `GET /v1/suppressions` | – (**personal data**: the suppression list), `admin` export keys only |
 
 ## API
 

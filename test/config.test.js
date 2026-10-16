@@ -20,7 +20,7 @@ test('Config: defaults, roles, configured sources only', () => {
 test('Config: rejects bad input', () => {
   const bad = (/** @type {Record<string,string>} */ o, /** @type {RegExp} */ re) => assert.throws(() => Config.fromEnv(testEnv(URL_, o)), (e) => e instanceof ConfigError && re.test(e.message));
   bad({ EXPORT_API_KEYS: '' }, /EXPORT_API_KEYS is required/);
-  bad({ EXPORT_API_KEYS: `a:${'a'.repeat(40)}:admin` }, /read, write or readwrite/);
+  bad({ EXPORT_API_KEYS: `a:${'a'.repeat(40)}:owner` }, /read, write, readwrite or admin/);
   bad({ MEDIA_URL: '', MEDIA_API_KEY: '' }, /MEDIA_URL and MEDIA_API_KEY are required/);
   bad({ SOURCE_FLAGS_URL: URL_ }, /SOURCE_FLAGS_URL and SOURCE_FLAGS_API_KEY must be set together/);
   bad({ SOURCE_FLAGS_URL: 'ftp://x', SOURCE_FLAGS_API_KEY: 'k'.repeat(40) }, /absolute http/);
