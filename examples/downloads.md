@@ -1,7 +1,7 @@
 # Downloading the file
 
 ```bash
-ecurl $EXPORT/v1/exports/exp_0mv7nhnir3b3cab534a3d/download
+ecurl $EXPORT/v1/exports/exp_mv7nhnir3b3cab534a3d9f1e/download
 ```
 
 ```json
@@ -13,7 +13,7 @@ The file is a **private** atc-media file; the URL is signed by media and valid f
 ## Deleting
 
 ```bash
-ecurl -X DELETE $EXPORT/v1/exports/exp_0mv7nhnir3b3cab534a3d     # 204
+ecurl -X DELETE $EXPORT/v1/exports/exp_mv7nhnir3b3cab534a3d9f1e     # 204
 ```
 
 The media file is deleted first, then the job. A running job must be cancelled first (`409 INVALID_STATE`). When media cannot be reached the delete fails with `502 MEDIA_ERROR` and the job stays, so no file is ever orphaned silently.

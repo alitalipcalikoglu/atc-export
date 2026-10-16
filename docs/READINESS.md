@@ -60,9 +60,11 @@ retried within a run (the stream cannot be replayed); the whole run is. Audit fo
 its own timer.
 
 ## Idempotency
-`POST /v1/exports` is not idempotent (each call queues a job). Cancel, retry and delete are guarded
-state transitions (`409 INVALID_STATE` when repeated). Completion e-mails carry
-`idempotencyKey = atc-export:<id>:<attempt>`. Reruns always produce a new file; a file uploaded by a
+`POST /v1/exports`, cancel and retry honour `Idempotency-Key` (core `Idempotency`, 24 h, per API key
+and caller): a repeat replays the first 2xx answer instead of queueing a second job. Without the
+header each create queues a job, and cancel, retry and delete are guarded state transitions (`409
+INVALID_STATE` when repeated). Completion e-mails send the `Idempotency-Key`
+`atc-export:<id>:<attempt>` header to atc-notify. Reruns always produce a new file; a file uploaded by a
 worker that lost its lease is deleted.
 
 ## Backup

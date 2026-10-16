@@ -142,9 +142,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, nextCursor]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/Source" } }
+                  nextCursor: { type: "null", description: Always null; the list is complete. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -175,6 +176,8 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     post:
       operationId: atc-export.exports.create
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       summary: Queue an export
       description: >
         `filters` are checked against the source's filter list from `GET /v1/sources`
@@ -241,6 +244,8 @@ paths:
       - $ref: "#/components/parameters/IdParam"
     post:
       operationId: atc-export.exports.cancel
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       summary: Cancel a queued or running export
       description: A queued job is cancelled at once; a running one gets `cancelRequested` and stops at its next heartbeat, discarding the partial upload.
       tags: [exports]
@@ -260,6 +265,8 @@ paths:
       - $ref: "#/components/parameters/IdParam"
     post:
       operationId: atc-export.exports.retry
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       summary: Queue a failed or cancelled export again from scratch
       tags: [exports]
       responses:
@@ -337,6 +344,12 @@ components:
       scheme: bearer
       description: "`Authorization: Bearer <secret>`. Keys are `id:secret[:role]` in `EXPORT_API_KEYS`; role `read`, `write` or `readwrite` (default)."
   parameters:
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: "Optional. Repeats of this POST with the same key (per API key, 24 h) replay the first 2xx answer with `Idempotent-Replayed: true` instead of running again; the same key with another method, path or body is `409 IDEMPOTENCY_MISMATCH`, while the first still runs `409 IDEMPOTENCY_IN_PROGRESS`."
+      schema: { type: string, pattern: '^[A-Za-z0-9._:-]{8,255}$' }
     IdParam:
       name: id
       in: path
@@ -381,7 +394,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
-    ExportId: { type: string, pattern: "^exp_[0-9a-z]{9}[0-9a-f]{12}$" }
+    ExportId: { type: string, pattern: "^exp_[0-9a-z]{6,12}[0-9a-f]{16}$" }
     Status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
     ErrorEnvelope:
       type: object

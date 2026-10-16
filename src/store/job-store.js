@@ -1,4 +1,5 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { Ids } from '@atc-web/atc-service-core/ids';
 
 /** @typedef {import('../db.js').Database} Database */
 /** @typedef {import('../types.js').JobRow} JobRow */
@@ -57,7 +58,7 @@ export class JobStore {
   static newId(now) {
     const ms = Math.max(now, JobStore.#lastIdMs + 1);
     JobStore.#lastIdMs = ms;
-    return `exp_${ms.toString(36).padStart(9, '0')}${randomBytes(6).toString('hex')}`;
+    return Ids.create('exp', ms);
   }
 
   /**

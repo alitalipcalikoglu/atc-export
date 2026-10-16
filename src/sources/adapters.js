@@ -244,8 +244,6 @@ export class QueueMessagesSource extends Source {
 export class SchedulerRunsSource extends Source {
   get id() { return 'atc-scheduler'; }
   get label() { return 'Scheduler runs'; }
-  get cursorParam() { return 'before'; }
-  get nextField() { return 'nextBefore'; }
   /** @returns {Record<string, FilterSpec>} */
   get filters() {
     return {
@@ -264,8 +262,6 @@ export class SchedulerRunsSource extends Source {
 export class WebhookDeliveriesSource extends Source {
   get id() { return 'atc-webhook-out'; }
   get label() { return 'Webhook deliveries'; }
-  get cursorParam() { return 'before'; }
-  get nextField() { return 'nextBefore'; }
   /** @returns {Record<string, FilterSpec>} */
   get filters() {
     return {

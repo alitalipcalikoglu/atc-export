@@ -81,6 +81,11 @@ All `/v1/*` routes and `/metrics` need `Authorization: Bearer <secret>`. Full co
 
 Errors are `{ "error": { "code", "message", "details"? } }`: `UNKNOWN_SOURCE`, `INVALID_FILTER`, `NOTIFY_DISABLED`, `VALIDATION_FAILED` (400); `EXPORT_NOT_FOUND` (404); `INVALID_STATE`, `NO_FILE` (409); `MEDIA_ERROR` (502); `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMITED`. A job's own `error.code` is one of `UPSTREAM_ERROR`, `MEDIA_ERROR`, `TOO_MANY_ROWS`, `TOO_LARGE`, `INTERRUPTED`.
 
+## Conventions
+
+- Lists answer `{ items, nextCursor }`; pass `nextCursor` back as `cursor`. Sources are a complete list (`nextCursor: null`). Exports have `exp_<time><random>` ids (the platform's one id format). Every source reads its upstream list with `cursor`/`nextCursor`.
+- Export creation, cancel and retry honour `Idempotency-Key`: a repeat with the same key (per API key and caller — the console's `X-Actor` counts — for 24 h) replays the first 2xx answer with `Idempotent-Replayed: true`; another body is `409 IDEMPOTENCY_MISMATCH`.
+
 ## Examples
 
 Scenario walkthroughs for every feature (requests, responses, pitfalls): [examples/README.md](examples/README.md).

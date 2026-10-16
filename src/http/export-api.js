@@ -3,6 +3,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import { AuditClient } from '@atc-web/atc-service-core/audit';
 import { createErrorHandler, registerInfo, registerOpenApi, registerProbes, registerRequestContext, requestOptions } from '@atc-web/atc-service-core/fastify';
+import { Idempotency } from '@atc-web/atc-service-core/idempotency';
 import { ExportError } from '../domain/errors.js';
 import { Actor } from './actor.js';
 import { ApiKeyAuth } from './api-key-auth.js';
@@ -64,6 +65,8 @@ export class ExportApi {
       reply.header('x-content-type-options', 'nosniff');
       if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
     });
+    // Opt-in per route (config.idempotent): repeats with the same Idempotency-Key replay the first 2xx answer.
+    Idempotency.register(app, { raw: this.db.raw });
     registerProbes(app, () => this.db.ping(), { cacheMs: ExportApi.READY_CACHE_MS, extra: () => ({ worker: this.worker.running ? 'running' : 'stopped' }) });
     registerOpenApi(app, new URL('../../openapi.yaml', import.meta.url));
     registerInfo(app, {
@@ -95,9 +98,9 @@ export class ExportApi {
     const target = (/** @type {FastifyRequest} */ r) => ({ type: 'export', id: id(r) });
     const view = (/** @type {import('../types.js').JobRow} */ j) => ({ export: Views.job(j, days) });
 
-    api.get('/sources', read, async () => ({ items: this.sources.list() }));
+    api.get('/sources', read, async () => ({ items: this.sources.list(), nextCursor: null }));
 
-    api.post('/exports', { config: { audit: AuditClient.route('atc-export.export.create', (_r, b) => ({ type: 'export', id: b.export.id }), (_r, b) => ({ source: b.export.source, format: b.export.format, filters: b.export.filters, notify: Boolean(b.export.notifyEmail) })) }, ...write, schema: { body: Schemas.create } }, async (request, reply) => {
+    api.post('/exports', { config: { idempotent: true, audit: AuditClient.route('atc-export.export.create', (_r, b) => ({ type: 'export', id: b.export.id }), (_r, b) => ({ source: b.export.source, format: b.export.format, filters: b.export.filters, notify: Boolean(b.export.notifyEmail) })) }, ...write, schema: { body: Schemas.create } }, async (request, reply) => {
       const j = s.create(/** @type {any} */ (request.body), who.of(request));
       reply.header('location', `/v1/exports/${j.id}`);
       return reply.code(202).send(view(j));
@@ -113,9 +116,9 @@ export class ExportApi {
 
     api.get('/exports/:id', { ...read, schema: { params: Schemas.idParams } }, async (request) => view(s.get(id(request))));
 
-    api.post('/exports/:id/cancel', { config: { audit: AuditClient.route('atc-export.export.cancel', target, (_r, b) => ({ status: b.export.status })) }, ...write, schema: { params: Schemas.idParams } }, async (request) => view(s.cancel(id(request))));
+    api.post('/exports/:id/cancel', { config: { idempotent: true, audit: AuditClient.route('atc-export.export.cancel', target, (_r, b) => ({ status: b.export.status })) }, ...write, schema: { params: Schemas.idParams } }, async (request) => view(s.cancel(id(request))));
 
-    api.post('/exports/:id/retry', { config: { audit: AuditClient.route('atc-export.export.retry', target) }, ...write, schema: { params: Schemas.idParams } }, async (request) => view(s.retry(id(request))));
+    api.post('/exports/:id/retry', { config: { idempotent: true, audit: AuditClient.route('atc-export.export.retry', target) }, ...write, schema: { params: Schemas.idParams } }, async (request) => view(s.retry(id(request))));
 
     api.get('/exports/:id/download', { config: { audit: AuditClient.route('atc-export.export.download', target) }, ...read, schema: { params: Schemas.idParams } }, async (request) => s.download(id(request)));
 

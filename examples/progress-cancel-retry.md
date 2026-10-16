@@ -11,7 +11,7 @@ failed / cancelled ──retry──> queued (attempts reset)
 ## Following a job
 
 ```bash
-ecurl $EXPORT/v1/exports/exp_0mv7nhnir3b3cab534a3d
+ecurl $EXPORT/v1/exports/exp_mv7nhnir3b3cab534a3d9f1e
 ```
 
 ```json
@@ -29,7 +29,7 @@ ecurl "$EXPORT/v1/exports?status=failed&limit=20"     # newest first; pass nextC
 ## Scenario: the wrong filter was used, stop it
 
 ```bash
-ecurl -X POST $EXPORT/v1/exports/exp_0mv7nhnir3b3cab534a3d/cancel
+ecurl -X POST $EXPORT/v1/exports/exp_mv7nhnir3b3cab534a3d9f1e/cancel
 ```
 
 A queued job is `cancelled` at once. A running one answers with `cancelRequested: true`; within one heartbeat the worker stops reading, aborts the upload (media keeps nothing) and the job turns `cancelled`. An export that finishes before the heartbeat notices stays `succeeded`.
@@ -39,7 +39,7 @@ A queued job is `cancelled` at once. A running one answers with `cancelRequested
 The job shows `failed` with `error.code: "UPSTREAM_ERROR"` after `MAX_ATTEMPTS` runs. Once the source is back:
 
 ```bash
-ecurl -X POST $EXPORT/v1/exports/exp_0mv7nhnir3b3cab534a3d/retry
+ecurl -X POST $EXPORT/v1/exports/exp_mv7nhnir3b3cab534a3d9f1e/retry
 ```
 
 The job is queued again from scratch: attempts reset, progress and error cleared. Only `failed` and `cancelled` jobs can be retried (`409 INVALID_STATE` otherwise).

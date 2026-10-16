@@ -63,7 +63,7 @@ test('API: create, list, get, download, cancel, retry, delete, stats, metrics', 
   assert.deepEqual(json(await app.inject({ url: '/v1/exports?status=succeeded', headers: h })).items.map((/** @type {any} */ x) => x.id), [e.id]);
   assert.equal((await app.inject({ url: '/v1/exports?status=done', headers: h })).statusCode, 400);
   assert.equal((await app.inject({ url: '/v1/exports/nope', headers: h })).statusCode, 400);
-  assert.equal((await app.inject({ url: `/v1/exports/exp_${'0'.repeat(9)}${'a'.repeat(12)}`, headers: h })).statusCode, 404);
+  assert.equal((await app.inject({ url: `/v1/exports/exp_${'0'.repeat(8)}${'a'.repeat(16)}`, headers: h })).statusCode, 404);
 
   const st = json(await app.inject({ url: '/v1/stats', headers: h }));
   assert.deepEqual([st.queued, st.running, st.total, st.last24h.succeeded, st.last24h.rows, st.retentionDays], [1, 0, 2, 1, 7, 7]);

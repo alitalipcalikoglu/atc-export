@@ -18,7 +18,7 @@ export class Source {
   /** @returns {Record<string, FilterSpec>} */ get filters() { return {}; }
   /** @returns {string[]} */ get columns() { throw new Error('abstract'); }
   /** Page size the owning service accepts. */ get pageSize() { return 100; }
-  /** Query parameter that carries the cursor, and the response field that holds the next one (`before`/`nextBefore` on keyset lists). */
+  /** Query parameter that carries the cursor, and the response field that holds the next one (every platform list uses `cursor`/`nextCursor`). */
   get cursorParam() { return 'cursor'; }
   get nextField() { return 'nextCursor'; }
 

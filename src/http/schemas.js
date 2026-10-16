@@ -1,6 +1,8 @@
+import { Ids } from '@atc-web/atc-service-core/ids';
+
 /** JSON Schemas for the HTTP surface. Per-source filters are validated by the source adapter. */
 export class Schemas {
-  static id = { type: 'string', pattern: '^exp_[0-9a-z]{9}[0-9a-f]{12}$' };
+  static id = { type: 'string', pattern: Ids.pattern('exp') };
   static source = { type: 'string', pattern: '^atc-[a-z][a-z0-9-]{0,30}$' };
   static status = { type: 'string', enum: ['queued', 'running', 'succeeded', 'failed', 'cancelled'] };
 

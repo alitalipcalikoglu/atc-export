@@ -91,7 +91,7 @@ test('ExportService: create validation, cancel/retry/delete state rules, downloa
   assert.throws(() => service.create({ source: 'atc-flags', format: 'csv' }, 'x'), fails('UNKNOWN_SOURCE'));
   assert.throws(() => service.create({ source: 'atc-auth', format: 'csv', filters: { x: '1' } }, 'x'), fails('INVALID_FILTER'));
   const j = service.create({ source: 'atc-auth', format: 'csv', notifyEmail: 'ops@example.com' }, 'console');
-  assert.match(j.id, /^exp_[0-9a-z]{9}[0-9a-f]{12}$/);
+  assert.match(j.id, /^exp_[0-9a-z]{6,12}[0-9a-f]{16}$/);
   assert.deepEqual([j.status, j.attempts, j.max_attempts, j.created_by, j.notify_email], ['queued', 0, 3, 'console', 'ops@example.com']);
   assert.throws(() => service.retry(j.id), fails('INVALID_STATE'));
   await assert.rejects(service.download(j.id), fails('NO_FILE'));
@@ -118,8 +118,8 @@ test('sources: payments, ledger, queue dead letters, scheduler runs and webhook 
   const pays = await collect('atc-payments', { status: 'refunded' });
   assert.deepEqual(pays.map((p) => [p.id, p.status, p.providerId, p.customerEmail]), [['pay_1', 'refunded', 'pi_1', 'c1@example.com'], ['pay_2', 'refunded', 'pi_2', 'c2@example.com'], ['pay_3', 'refunded', 'pi_3', 'c3@example.com']]);
   const runs = await collect('atc-scheduler', { job: 'nightly.report', status: 'failed' });
-  assert.deepEqual(runs.map((r) => r.id), [5, 4, 3, 2, 1], 'keyset paging with before/nextBefore');
-  assert.ok(up.state.seen.some((s) => s.url.startsWith('/v1/runs?job=nightly.report&status=failed&limit=100&before=4')));
+  assert.deepEqual(runs.map((r) => r.id), [5, 4, 3, 2, 1], 'keyset paging with cursor/nextCursor');
+  assert.ok(up.state.seen.some((s) => s.url.startsWith('/v1/runs?job=nightly.report&status=failed&limit=100&cursor=4')));
   assert.ok(!('attempts' in /** @type {any} */ (runs[0])), 'attempt logs are not part of the columns');
   const dead = await collect('atc-queue', { queue: 'jobs' });
   assert.deepEqual([dead[0].id, dead[0].state, dead[0].body], ['msg_1', 'dead', { to: 'a' }]);
