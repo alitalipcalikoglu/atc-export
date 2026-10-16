@@ -12,8 +12,10 @@ file is downloaded through a short-lived signed URL; jobs and files are deleted 
   `application/x-ndjson` (`ALLOWED_TYPES`) and `MAX_UPLOAD_BYTES >= EXPORT_MAX_BYTES`. When it is
   down, runs fail transiently and are retried; download and delete answer `502 MEDIA_ERROR`.
 - **Sources** (`SOURCE_<NAME>_URL` + `SOURCE_<NAME>_API_KEY`, each optional): atc-audit, atc-auth,
-  atc-shortlink, atc-flags, atc-media, atc-content, read keys. Called only by the worker, never in
-  the request path.
+  atc-shortlink, atc-flags, atc-media, atc-content, atc-payments, atc-status, atc-queue,
+  atc-scheduler, atc-webhook-out and atc-notify. Read keys, except notify, which needs an admin-role
+  key (every sender's messages and the suppression list). Called only by the worker, never in the
+  request path; only configured sources are offered.
 - **atc-notify** (`NOTIFY_URL` + `NOTIFY_API_KEY`, optional): completion e-mails (`generic`
   template); a failed mail never fails the job.
 - **atc-audit** (`AUDIT_URL` + `AUDIT_API_KEY`, optional): forwarding of write/download events,
