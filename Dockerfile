@@ -5,7 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 FROM node:22-alpine
-ENV NODE_ENV=production DB_PATH=/data/export.db PORT=3014
+ENV NODE_ENV=production DB_PATH=/data/export.db SPOOL_DIR=/data/spool PORT=3014
 WORKDIR /app
 RUN mkdir -p /data && chown node:node /data
 COPY --from=deps /app/node_modules ./node_modules
